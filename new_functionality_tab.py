@@ -87,10 +87,9 @@ def render_options_tab(df):
     # Merge CE and PE data on Strike Price
     merged_options_display = pd.merge(ce_df, pe_df, on='StrkPric', how='outer')
     
-    # Calculate Put-Call Open Interest Ratio (PCROI)
-    total_ce_oi = merged_options_display['CE_OpnIntrst'].sum()
-    total_pe_oi = merged_options_display['PE_OpnIntrst'].sum()
-    merged_options_display['PCROI'] = total_pe_oi / total_ce_oi if total_ce_oi != 0 else 0
+    # Calculate Put-Call Open Interest Ratio (PCROI) per strike price
+    merged_options_display['PCROI'] = merged_options_display['PE_OpnIntrst'] / merged_options_display['CE_OpnIntrst'].replace(0, pd.NA)
+    merged_options_display['PCROI'].fillna(0, inplace=True) # Fill NaN (from division by zero) with 0
 
     # Sort by %CH IN OI in descending order, handling potential NaN values in sorting columns
     merged_options_display['CE_%CH IN OI_sort'] = merged_options_display['CE_%CH IN OI'].fillna(-float('inf'))
@@ -183,10 +182,9 @@ def render_nifty_tab(df):
     # Merge CE and PE data on Strike Price
     merged_nifty_display = pd.merge(ce_df, pe_df, on='StrkPric', how='outer')
 
-    # Calculate Put-Call Open Interest Ratio (PCROI)
-    total_ce_oi = merged_nifty_display['CE_OpnIntrst'].sum()
-    total_pe_oi = merged_nifty_display['PE_OpnIntrst'].sum()
-    merged_nifty_display['PCROI'] = total_pe_oi / total_ce_oi if total_ce_oi != 0 else 0
+    # Calculate Put-Call Open Interest Ratio (PCROI) per strike price
+    merged_nifty_display['PCROI'] = merged_nifty_display['PE_OpnIntrst'] / merged_nifty_display['CE_OpnIntrst'].replace(0, pd.NA)
+    merged_nifty_display['PCROI'].fillna(0, inplace=True) # Fill NaN (from division by zero) with 0
 
     # Sort by %CH IN OI in descending order, handling potential NaN values in sorting columns
     merged_nifty_display['CE_%CH IN OI_sort'] = merged_nifty_display['CE_%CH IN OI'].fillna(-float('inf'))
