@@ -216,3 +216,4 @@ def render_new_functionality_tab():
         render_futures_tab(df)
     with options_tab:
         render_options_tab(df)
+        #new
