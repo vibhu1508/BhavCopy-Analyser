@@ -1,30 +1,66 @@
 import streamlit as st
+import zipfile
+import io
 import pandas as pd
 from io import StringIO
 
+import streamlit as st
+import pandas as pd
+import zipfile
+import io
+
 def process_csv(file_upload):
     """
-    Processes a single CSV file: reads, selects columns, filters rows, and converts 'ClsPric' to numeric.
+    Processes a CSV inside a ZIP file:
+    - Reads the CSV
+    - Selects required columns
+    - Filters rows for SctySrs in ['EQ', 'BE']
+    - Converts 'ClsPric' to numeric
     """
-    if file_upload is not None:
-        dataframe = pd.read_csv(file_upload)
 
+    if file_upload is None:
+        return None
+
+    # Ensure uploaded file is a ZIP
+    if not file_upload.name.endswith(".zip"):
+        st.error("Only ZIP files are allowed.")
+        return None
+
+    try:
+        with zipfile.ZipFile(file_upload, 'r') as z:
+            # Find the first CSV inside the zip
+            csv_file_name = next((name for name in z.namelist() if name.endswith('.csv')), None)
+            
+            if csv_file_name is None:
+                st.error("No CSV file found inside the ZIP.")
+                return None
+
+            # Open CSV inside zip
+            with z.open(csv_file_name) as csv_file:
+                dataframe = pd.read_csv(io.TextIOWrapper(csv_file, 'utf-8'))
+
+        # Required columns
         required_columns = ['TradDt', 'SctySrs', 'FinInstrmNm', 'ClsPric', 'TckrSymb']
         for col in required_columns:
             if col not in dataframe.columns:
-                st.error(f"Missing required column: {col} in {file_upload.name}")
+                st.error(f"Missing required column: {col} in {csv_file_name}")
                 return None
-        
+
+        # Keep only required columns
         dataframe = dataframe[required_columns]
 
+        # Filter rows
         dataframe = dataframe[dataframe['SctySrs'].isin(['EQ', 'BE'])]
 
+        # Convert 'ClsPric' to numeric
         dataframe['ClsPric'] = pd.to_numeric(dataframe['ClsPric'], errors='coerce')
-        
         dataframe.dropna(subset=['ClsPric'], inplace=True)
 
         return dataframe
-    return None
+
+    except zipfile.BadZipFile:
+        st.error("Invalid ZIP file.")
+        return None
 
 def calculate_percentage_difference(df1, df2):
     """
@@ -47,11 +83,11 @@ def calculate_percentage_difference(df1, df2):
 
 def render_stock_comparison_tab():
     st.title("NSE Stock Price Comparison Tool")
-    st.write("Upload two BhavCopy CSV files to compare stock prices and find percentage differences.")
+    st.write("Upload two BhavCopy Zip files to compare stock prices and find percentage differences.")
 
     st.subheader("Upload CSV Files")
-    file1 = st.file_uploader("Upload First BhavCopy CSV File", type=["csv"], key="file1")
-    file2 = st.file_uploader("Upload Second BhavCopy CSV File", type=["csv"], key="file2")
+    file1 = st.file_uploader("Upload First BhavCopy ZIP File", type=["zip"], key="file1")
+    file2 = st.file_uploader("Upload Second BhavCopy ZIP File", type=["zip"], key="file2")
 
     if st.button("Process Files"):
         if file1 is not None and file2 is not None:

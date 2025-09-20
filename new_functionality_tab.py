@@ -87,6 +87,11 @@ def render_options_tab(df):
     # Merge CE and PE data on Strike Price
     merged_options_display = pd.merge(ce_df, pe_df, on='StrkPric', how='outer')
     
+    # Calculate Put-Call Open Interest Ratio (PCROI)
+    total_ce_oi = merged_options_display['CE_OpnIntrst'].sum()
+    total_pe_oi = merged_options_display['PE_OpnIntrst'].sum()
+    merged_options_display['PCROI'] = total_pe_oi / total_ce_oi if total_ce_oi != 0 else 0
+
     # Sort by %CH IN OI in descending order, handling potential NaN values in sorting columns
     merged_options_display['CE_%CH IN OI_sort'] = merged_options_display['CE_%CH IN OI'].fillna(-float('inf'))
     merged_options_display['PE_%CH IN OI_sort'] = merged_options_display['PE_%CH IN OI'].fillna(-float('inf'))
@@ -105,7 +110,9 @@ def render_futures_tab(df):
         st.info("No futures data available or uploaded.")
         return
     
-    futures_df = df[df['FinInstrmNm'].str.contains('FUT', na=False)]
+    # Filter for Futures data: FinInstrmNm contains 'FUT' and OptnTp is NaN or not present
+    futures_df = df[df['FinInstrmNm'].str.contains('FUT', na=False) & df['OptnTp'].isna()]
+
     if futures_df.empty:
         st.info("No futures data found in the uploaded file.")
         return
@@ -175,6 +182,11 @@ def render_nifty_tab(df):
 
     # Merge CE and PE data on Strike Price
     merged_nifty_display = pd.merge(ce_df, pe_df, on='StrkPric', how='outer')
+
+    # Calculate Put-Call Open Interest Ratio (PCROI)
+    total_ce_oi = merged_nifty_display['CE_OpnIntrst'].sum()
+    total_pe_oi = merged_nifty_display['PE_OpnIntrst'].sum()
+    merged_nifty_display['PCROI'] = total_pe_oi / total_ce_oi if total_ce_oi != 0 else 0
 
     # Sort by %CH IN OI in descending order, handling potential NaN values in sorting columns
     merged_nifty_display['CE_%CH IN OI_sort'] = merged_nifty_display['CE_%CH IN OI'].fillna(-float('inf'))
