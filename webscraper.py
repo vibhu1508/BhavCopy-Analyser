@@ -12,7 +12,6 @@ import json
 import requests
 import tempfile # Import tempfile
 import shutil # Import shutil
-# import os # Removed os import as it's no longer needed
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -64,11 +63,7 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu") # Disable GPU for headless
-    chrome_options.add_argument("--disable-extensions") # Disable extensions
-    chrome_options.add_argument("--disable-setuid-sandbox") # Disable setuid sandbox
-    chrome_options.add_argument("--disable-site-isolation-trials") # Disable site isolation trials
     chrome_options.add_argument("--disable-blink-features=AutomationControlled") # Important for anti-detection
-    chrome_options.add_argument("--incognito") # Use incognito for fresh session
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -81,19 +76,8 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
         
         service = Service() # Initialize Service object
         
-        max_driver_retries = 3
-        for i in range(max_driver_retries):
-            try:
-                driver = webdriver.Chrome(service=service, options=chrome_options) # Pass service object
-                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-                logger.info(f"WebDriver initialized successfully on attempt {i+1}")
-                break # Exit loop if successful
-            except Exception as driver_e:
-                logger.warning(f"Failed to initialize WebDriver on attempt {i+1}: {driver_e}")
-                if i < max_driver_retries - 1:
-                    time.sleep(2 * (i + 1)) # Exponential back-off
-                else:
-                    raise # Re-raise if all retries fail
+        driver = webdriver.Chrome(service=service, options=chrome_options) # Pass service object
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
         # The rest of the try block
         # Step 1: Visit main page to establish session

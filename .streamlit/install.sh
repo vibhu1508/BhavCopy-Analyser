@@ -25,19 +25,21 @@ echo "Symlink for google-chrome created at /usr/local/bin/google-chrome."
 ls -l /usr/local/bin/google-chrome # Verify symlink
 
 # Install chromedriver
-# Get the installed Chrome version
-INSTALLED_CHROME_VERSION=$(google-chrome --version | grep -Eo "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | head -n 1)
-echo "Detected installed Chrome version: $INSTALLED_CHROME_VERSION"
+echo "Installing compatible chromedriver..."
+# Get the installed Chrome major version
+INSTALLED_CHROME_MAJOR_VERSION=$(google-chrome --version | grep -Eo "[0-9]{1,3}" | head -n 1)
+echo "Detected installed Chrome major version: $INSTALLED_CHROME_MAJOR_VERSION"
 
-# Get the latest compatible ChromeDriver version for the installed Chrome version
-CHROMEDRIVER_VERSION=$(wget -qO- "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$INSTALLED_CHROME_VERSION")
-echo "Downloading ChromeDriver version: $CHROMEDRIVER_VERSION"
+# Find the latest chromedriver version for the installed major version
+CHROMEDRIVER_VERSION=$(wget -qO- "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$INSTALLED_CHROME_MAJOR_VERSION")
+echo "Found compatible ChromeDriver version: $CHROMEDRIVER_VERSION"
 
-wget -q --continue -P /tmp "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
-unzip /tmp/chromedriver-linux64.zip -d /tmp
+# Download and install chromedriver
+wget -q --continue -P /tmp "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
+unzip -o /tmp/chromedriver_linux64.zip -d /tmp # Use -o to overwrite without prompting
 
 # Move chromedriver to /usr/local/bin and set permissions
-sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+sudo mv /tmp/chromedriver /usr/local/bin/chromedriver
 sudo chmod +x /usr/local/bin/chromedriver
 echo "ChromeDriver installed at /usr/local/bin/chromedriver."
 ls -l /usr/local/bin/chromedriver # Verify chromedriver existence and permissions
