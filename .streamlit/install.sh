@@ -17,10 +17,12 @@ which google-chrome # Verify installation path
 google-chrome --version # Verify Chrome version
 
 # Install chromedriver
-CHROME_VERSION=$(google-chrome --version | grep -Eo "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | head -n 1)
-echo "Detected Chrome version: $CHROME_VERSION"
+# Get the installed Chrome version
+INSTALLED_CHROME_VERSION=$(google-chrome --version | grep -Eo "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | head -n 1)
+echo "Detected installed Chrome version: $INSTALLED_CHROME_VERSION"
 
-CHROMEDRIVER_VERSION=$(wget -qO- "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$CHROME_VERSION")
+# Get the latest compatible ChromeDriver version for the installed Chrome version
+CHROMEDRIVER_VERSION=$(wget -qO- "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$INSTALLED_CHROME_VERSION")
 echo "Downloading ChromeDriver version: $CHROMEDRIVER_VERSION"
 
 wget -q --continue -P /tmp "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
