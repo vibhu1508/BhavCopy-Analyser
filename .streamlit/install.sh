@@ -28,11 +28,12 @@ echo "Downloading ChromeDriver version: $CHROMEDRIVER_VERSION"
 wget -q --continue -P /tmp "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
 unzip /tmp/chromedriver-linux64.zip -d /tmp
 
-# Move chromedriver to /usr/local/bin and set permissions
-sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-sudo chmod +x /usr/local/bin/chromedriver
-echo "ChromeDriver installed at /usr/local/bin/chromedriver."
-ls -l /usr/local/bin/chromedriver # Verify chromedriver existence and permissions
+# Move chromedriver to /app and set permissions
+mkdir -p /app
+sudo mv /tmp/chromedriver-linux64/chromedriver /app/chromedriver
+sudo chmod +x /app/chromedriver
+echo "ChromeDriver installed at /app/chromedriver."
+ls -l /app/chromedriver # Verify chromedriver existence and permissions
 
-# Check PATH environment variable
+# Check PATH environment variable (though we'll use explicit path in Python)
 echo "PATH: $PATH"
