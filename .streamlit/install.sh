@@ -8,11 +8,13 @@ sudo apt-get remove chromium -y
 sudo apt-get autoremove -y
 
 echo "Installing Google Chrome..."
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-sudo apt install ./google-chrome-stable_current_amd64.deb -y
-sudo rm google-chrome-stable_current_amd64.deb
+wget -v https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome-stable_current_amd64.deb
+ls -l /tmp/google-chrome-stable_current_amd64.deb # Verify download
+sudo apt install /tmp/google-chrome-stable_current_amd64.deb -y
+sudo rm /tmp/google-chrome-stable_current_amd64.deb
 echo "Google Chrome installed."
 which google-chrome # Verify installation path
+google-chrome --version # Verify Chrome version
 
 # Install chromedriver
 CHROME_VERSION=$(google-chrome --version | grep -Eo "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | head -n 1)
