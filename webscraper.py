@@ -12,7 +12,7 @@ import json
 import requests
 import tempfile # Import tempfile
 import shutil # Import shutil
-import os # Import os for path manipulation
+# import os # Removed os import as it's no longer needed for chromedriver logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -70,6 +70,19 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     chrome_options.add_argument("--disable-setuid-sandbox") # Disable setuid sandbox
     chrome_options.add_argument("--disable-site-isolation-trials") # Disable site isolation trials
     chrome_options.add_argument("--disable-features=VizDisplayCompositor") # Disable VizDisplayCompositor
+    
+    # Additional arguments for stability in headless environments
+    chrome_options.add_argument("--disable-features=NetworkService")
+    chrome_options.add_argument("--disable-features=NetworkServiceInProcess")
+    chrome_options.add_argument("--disable-background-networking")
+    chrome_options.add_argument("--disable-default-apps")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--disable-translate")
+    chrome_options.add_argument("--hide-scrollbars")
+    chrome_options.add_argument("--metrics-recording-only")
+    chrome_options.add_argument("--mute-audio")
+    chrome_options.add_argument("--no-first-run")
+
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -81,8 +94,8 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
         chrome_options.add_argument(f"--user-data-dir={user_data_dir}") # Re-introduce user_data_dir management
         
         # Create a log file for chromedriver
-        chromedriver_log_path = os.path.join(user_data_dir, "chromedriver.log")
-        service = Service(log_output=chromedriver_log_path) # Initialize Service object with log output
+        # chromedriver_log_path = os.path.join(user_data_dir, "chromedriver.log") # Removed log path
+        service = Service() # Initialize Service object without log output
         
         max_driver_retries = 3
         for i in range(max_driver_retries):
