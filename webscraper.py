@@ -1,17 +1,14 @@
-from selenium import webdriver # type: ignore
-from selenium.webdriver.common.by import By # type: ignore
-from selenium.webdriver.support.ui import WebDriverWait # type: ignore
-from selenium.webdriver.support import expected_conditions as EC # type: ignore
-from selenium.webdriver.chrome.options import Options # type: ignore
-from selenium.common.exceptions import TimeoutException, StaleElementReferenceException # type: ignore
-from selenium.webdriver.chrome.service import Service # Import Service
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 import pandas as pd
 import time
 import logging
 import json
 import requests
-import tempfile # Import tempfile
-import shutil # Import shutil
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -59,27 +56,19 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     """
     
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new") # Run Chrome in headless mode
+    chrome_options.add_argument("--headless") # Run Chrome in headless mode
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu") # Disable GPU for headless
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled") # Important for anti-detection
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    driver = None # Initialize driver to None
-    user_data_dir = None 
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    
     try:
-        user_data_dir = tempfile.mkdtemp() # Use tempfile for unique user data directory
-        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-        
-        service = Service() # Initialize Service object
-        
-        driver = webdriver.Chrome(service=service, options=chrome_options) # Pass service object
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        
-        # The rest of the try block
         # Step 1: Visit main page to establish session
         logger.info("Establishing session with NSE...")
         driver.get("https://www.nseindia.com/")
@@ -213,10 +202,7 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
         return pd.DataFrame()
         
     finally:
-        if driver:
-            driver.quit()
-        if user_data_dir: # Clean up the temporary directory
-            shutil.rmtree(user_data_dir)
+        driver.quit()
 
 def find_api_manually():
     """
