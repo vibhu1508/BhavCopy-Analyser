@@ -3,8 +3,8 @@ from selenium.webdriver.common.by import By # type: ignore
 from selenium.webdriver.support.ui import WebDriverWait # type: ignore
 from selenium.webdriver.support import expected_conditions as EC # type: ignore
 from selenium.webdriver.chrome.options import Options # type: ignore
-from selenium.webdriver.chrome.service import Service # Import Service
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException # type: ignore
+from selenium.webdriver.chrome.service import Service # Import Service
 from webdriver_manager.chrome import ChromeDriverManager # Import ChromeDriverManager
 import pandas as pd
 import time
