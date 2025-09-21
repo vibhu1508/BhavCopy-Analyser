@@ -1,1 +1,2 @@
 wget
+google-chrome-stable

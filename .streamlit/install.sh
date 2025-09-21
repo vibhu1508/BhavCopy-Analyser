@@ -3,6 +3,10 @@
 echo "Updating apt-get..."
 sudo apt-get update -y
 
+echo "Removing existing chromium if present..."
+sudo apt-get remove chromium -y
+sudo apt-get autoremove -y
+
 echo "Installing Google Chrome..."
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 sudo apt install ./google-chrome-stable_current_amd64.deb -y
