@@ -74,13 +74,24 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
     driver = None # Initialize driver to None
-    # user_data_dir = None # Removed user_data_dir management
+    user_data_dir = None # Re-introduce user_data_dir management
     try:
-        # user_data_dir = tempfile.mkdtemp() # Removed user_data_dir management
-        # chrome_options.add_argument(f"--user-data-dir={user_data_dir}") # Removed user_data_dir management
+        user_data_dir = tempfile.mkdtemp() # Re-introduce user_data_dir management
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}") # Re-introduce user_data_dir management
         
-        driver = webdriver.Chrome(options=chrome_options)
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        max_driver_retries = 3
+        for i in range(max_driver_retries):
+            try:
+                driver = webdriver.Chrome(options=chrome_options)
+                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                logger.info(f"WebDriver initialized successfully on attempt {i+1}")
+                break # Exit loop if successful
+            except Exception as driver_e:
+                logger.warning(f"Failed to initialize WebDriver on attempt {i+1}: {driver_e}")
+                if i < max_driver_retries - 1:
+                    time.sleep(2 * (i + 1)) # Exponential back-off
+                else:
+                    raise # Re-raise if all retries fail
         
         # The rest of the try block
         # Step 1: Visit main page to establish session
@@ -218,8 +229,8 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     finally:
         if driver:
             driver.quit()
-        # if user_data_dir: # Removed user_data_dir management
-        #     shutil.rmtree(user_data_dir) # Clean up the temporary directory
+        if user_data_dir: # Re-introduce user_data_dir management
+            shutil.rmtree(user_data_dir) # Clean up the temporary directory
 
 def find_api_manually():
     """
