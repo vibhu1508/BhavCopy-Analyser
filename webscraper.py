@@ -10,6 +10,8 @@ import time
 import logging
 import json
 import requests
+import tempfile # Import tempfile
+import shutil # Import shutil
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -62,14 +64,24 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--incognito")
+    chrome_options.add_argument("--disable-extensions") # Disable extensions
+    chrome_options.add_argument("--disable-setuid-sandbox") # Disable setuid sandbox
+    chrome_options.add_argument("--disable-site-isolation-trials") # Disable site isolation trials
+    chrome_options.add_argument("--disable-features=VizDisplayCompositor") # Disable VizDisplayCompositor
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    
+    user_data_dir = None
     try:
+        user_data_dir = tempfile.mkdtemp()
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        
+        driver = webdriver.Chrome(options=chrome_options)
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
+        # The rest of the try block
         # Step 1: Visit main page to establish session
         logger.info("Establishing session with NSE...")
         driver.get("https://www.nseindia.com/")
@@ -203,7 +215,10 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
         return pd.DataFrame()
         
     finally:
-        driver.quit()
+        if driver:
+            driver.quit()
+        if user_data_dir:
+            shutil.rmtree(user_data_dir) # Clean up the temporary directory
 
 def find_api_manually():
     """
