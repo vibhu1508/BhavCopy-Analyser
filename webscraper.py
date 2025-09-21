@@ -12,6 +12,7 @@ import json
 import requests
 import tempfile # Import tempfile
 import shutil # Import shutil
+import os # Import os for path manipulation
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -79,10 +80,14 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
         user_data_dir = tempfile.mkdtemp() # Re-introduce user_data_dir management
         chrome_options.add_argument(f"--user-data-dir={user_data_dir}") # Re-introduce user_data_dir management
         
+        # Create a log file for chromedriver
+        chromedriver_log_path = os.path.join(user_data_dir, "chromedriver.log")
+        service = Service(log_output=chromedriver_log_path) # Initialize Service object with log output
+        
         max_driver_retries = 3
         for i in range(max_driver_retries):
             try:
-                driver = webdriver.Chrome(options=chrome_options)
+                driver = webdriver.Chrome(service=service, options=chrome_options) # Pass service object
                 driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                 logger.info(f"WebDriver initialized successfully on attempt {i+1}")
                 break # Exit loop if successful
