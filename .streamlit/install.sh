@@ -1,0 +1,20 @@
+#!/bin/bash
+
+echo "Installing Google Chrome..."
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt install ./google-chrome-stable_current_amd64.deb -y
+sudo rm google-chrome-stable_current_amd64.deb
+echo "Google Chrome installed."
+
+# Install chromedriver
+CHROME_VERSION=$(google-chrome --version | grep -Eo "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | head -n 1)
+echo "Detected Chrome version: $CHROME_VERSION"
+
+CHROMEDRIVER_VERSION=$(wget -qO- "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_$CHROME_VERSION")
+echo "Downloading ChromeDriver version: $CHROMEDRIVER_VERSION"
+
+wget -q --continue -P /tmp "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
+unzip /tmp/chromedriver-linux64.zip -d /tmp
+sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+sudo chmod +x /usr/local/bin/chromedriver
+echo "ChromeDriver installed."
