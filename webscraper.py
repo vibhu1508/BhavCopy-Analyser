@@ -73,10 +73,11 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    user_data_dir = None
+    driver = None # Initialize driver to None
+    # user_data_dir = None # Removed user_data_dir management
     try:
-        user_data_dir = tempfile.mkdtemp()
-        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        # user_data_dir = tempfile.mkdtemp() # Removed user_data_dir management
+        # chrome_options.add_argument(f"--user-data-dir={user_data_dir}") # Removed user_data_dir management
         
         driver = webdriver.Chrome(options=chrome_options)
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -217,8 +218,8 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     finally:
         if driver:
             driver.quit()
-        if user_data_dir:
-            shutil.rmtree(user_data_dir) # Clean up the temporary directory
+        # if user_data_dir: # Removed user_data_dir management
+        #     shutil.rmtree(user_data_dir) # Clean up the temporary directory
 
 def find_api_manually():
     """
