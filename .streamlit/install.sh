@@ -30,3 +30,5 @@ unzip /tmp/chromedriver-linux64.zip -d /tmp
 sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
 sudo chmod +x /usr/local/bin/chromedriver
 echo "ChromeDriver installed."
+ls -l /usr/local/bin/chromedriver # Verify chromedriver existence and permissions
+echo "PATH: $PATH" # Check PATH environment variable
