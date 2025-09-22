@@ -4,6 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
+from webdriver_manager.chrome import ChromeDriverManager # Import ChromeDriverManager
 import pandas as pd
 import time
 import logging
@@ -61,11 +62,13 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--no-zygote") # Added for deployment stability
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    driver = webdriver.Chrome(options=chrome_options)
+    # Use ChromeDriverManager to get the driver path
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
     try:
@@ -204,80 +207,6 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     finally:
         driver.quit()
 
-def find_api_manually():
-    """
-    Instructions for manually finding the API endpoint
-    """
-    print("""
-    ====== MANUAL API DISCOVERY GUIDE ======
-    
-    Since automated scraping is challenging, here's how to find the API:
-    
-    1. Open Chrome (regular browser, not Selenium)
-    
-    2. Navigate to:
-       https://www.nseindia.com/companies-listing/corporate-filings-announcements
-    
-    3. Press F12 to open DevTools
-    
-    4. Go to the "Network" tab
-    
-    5. Click on "XHR" or "Fetch" filter
-    
-    6. Now enter "AXISBANK" in the symbol field on the webpage
-    
-    7. Look in the Network tab for requests. You'll likely see something like:
-       - corporate-announcements
-       - getcorporateannouncements  
-       - announcements-data
-    
-    8. Click on that request and go to "Response" tab
-    
-    9. If you see JSON data with announcements, that's your API!
-    
-    10. Right-click the request → Copy → Copy as cURL
-    
-    11. The URL from that cURL command is what you need
-    
-    Common NSE API patterns:
-    - /api/corporates-pit
-    - /api/corporate-actions
-    - /api/merged-daily-reports
-    - /api/announcements/corporates
-    
-    Once you find it, you can use it directly with requests library!
-    """)
-
-def use_discovered_api(api_url, symbol="AXISBANK"):
-    """
-    Once you discover the API, use this function
-    """
-    session = requests.Session()
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Referer': f'https://www.nseindia.com/companies-listing/corporate-filings-announcements?symbol={symbol}',
-        'X-Requested-With': 'XMLHttpRequest',
-    }
-    
-    # Get main page first for cookies
-    session.get("https://www.nseindia.com/", headers=headers)
-    
-    # Now get the API
-    response = session.get(api_url, headers=headers)
-    
-    if response.status_code == 200:
-        data = response.json()
-        df = pd.DataFrame(data)
-        print(f"✅ Successfully fetched {len(df)} records from API")
-        return df
-    else:
-        print(f"❌ API returned status {response.status_code}")
-        return None
-
 if __name__ == "__main__":
     symbol = "AXISBANK"
     
@@ -295,16 +224,3 @@ if __name__ == "__main__":
         print(df[['Subject', 'Broadcast Date']].head(3))
     else:
         print("\n❌ Automated scraping failed")
-        print("\n" + "=" * 60)
-        print("RECOMMENDED: Find the API endpoint manually")
-        print("=" * 60)
-        find_api_manually()
-        
-        print("\n" + "=" * 60)
-        print("Example: Once you find the API URL, use it like this:")
-        print("=" * 60)
-        print("""
-# Example usage with discovered API:
-api_url = "https://www.nseindia.com/api/[YOUR-DISCOVERED-ENDPOINT]"
-df = use_discovered_api(api_url, "AXISBANK")
-""")
