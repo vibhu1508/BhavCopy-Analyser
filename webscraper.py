@@ -4,6 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
+from selenium.webdriver.chrome.service import Service # Import Service
 from webdriver_manager.chrome import ChromeDriverManager # Import ChromeDriverManager
 import pandas as pd
 import time
@@ -67,8 +68,9 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     chrome_options.add_experimental_option('useAutomationExtension', False)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # Use ChromeDriverManager to get the driver path
-    driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=chrome_options)
+    # Use ChromeDriverManager to get the driver path and create a Service object
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
     try:
