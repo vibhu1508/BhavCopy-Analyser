@@ -94,15 +94,15 @@ def calculate_percentage_difference(df1, df2):
     merged_df['Percentage_Change_Price'] = ((merged_df['ClsPric_file2'] - merged_df['ClsPric_file1']) / merged_df['ClsPric_file1']) * 100
     
     merged_df['TtlTradgVol_file1'] = merged_df['TtlTradgVol_file1'].replace(0, pd.NA) # Handle division by zero for volume
-    merged_df['Percentage_Change_Volume'] = ((merged_df['TtlTradgVol_file2'] - merged_df['TtlTradgVol_file1']) / merged_df['TtlTradgVol_file1']) * 100
+    merged_df['Ratio_Volume'] = ((merged_df['TtlTradgVol_file2']) / merged_df['TtlTradgVol_file1'])
 
-    merged_df.dropna(subset=['Percentage_Change_Price', 'Percentage_Change_Volume'], inplace=True)
+    merged_df.dropna(subset=['Percentage_Change_Price','Ratio_Volume'], inplace=True)
 
     result_df = merged_df[[
         'FinInstrmNm', 
         'Percentage_Change_Price',
         'ClsPric_file2', 
-        'Percentage_Change_Volume',
+        'Ratio_Volume',
         'TtlTradgVol_file2'
     ]].sort_values(by='Percentage_Change_Price', ascending=False)
 
@@ -110,7 +110,7 @@ def calculate_percentage_difference(df1, df2):
         'FinInstrmNm': 'Financial Instrument Name',
         'Percentage_Change_Price': '%_Change_Price',
         'ClsPric_file2': 'End Date Closing Price',
-        'Percentage_Change_Volume': '%_Change_Volume',
+        'Ratio_Volume': 'Ratio_Volume',
         'TtlTradgVol_file2': 'End Date Volume'
     }, inplace=True)
 
