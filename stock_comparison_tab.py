@@ -91,18 +91,28 @@ def calculate_percentage_difference(df1, df2):
 
 
     merged_df['ClsPric_file1'] = merged_df['ClsPric_file1'].replace(0, pd.NA)
-    merged_df['Percentage_Change'] = ((merged_df['ClsPric_file2'] - merged_df['ClsPric_file1']) / merged_df['ClsPric_file1']) * 100
+    merged_df['Percentage_Change_Price'] = ((merged_df['ClsPric_file2'] - merged_df['ClsPric_file1']) / merged_df['ClsPric_file1']) * 100
+    
+    merged_df['TtlTradgVol_file1'] = merged_df['TtlTradgVol_file1'].replace(0, pd.NA) # Handle division by zero for volume
+    merged_df['Percentage_Change_Volume'] = ((merged_df['TtlTradgVol_file2'] - merged_df['TtlTradgVol_file1']) / merged_df['TtlTradgVol_file1']) * 100
 
-    merged_df.dropna(subset=['Percentage_Change'], inplace=True)
+    merged_df.dropna(subset=['Percentage_Change_Price', 'Percentage_Change_Volume'], inplace=True)
 
     result_df = merged_df[[
         'FinInstrmNm', 
-        'ClsPric_file1', 
-        'TtlTradgVol_file1', 
         'ClsPric_file2', 
         'TtlTradgVol_file2', 
-        'Percentage_Change'
-    ]].sort_values(by='Percentage_Change', ascending=False)
+        'Percentage_Change_Volume',
+        'Percentage_Change_Price'
+    ]].sort_values(by='Percentage_Change_Price', ascending=False)
+
+    result_df.rename(columns={
+        'FinInstrmNm': 'Financial Instrument Name',
+        'ClsPric_file2': 'Closing Price',
+        'TtlTradgVol_file2': 'Total Trading Volume',
+        'Percentage_Change_Volume': 'Percentage Change in Trading Volume',
+        'Percentage_Change_Price': 'Percentage Change Price'
+    }, inplace=True)
 
     return result_df
 
@@ -116,8 +126,8 @@ def render_stock_comparison_tab():
     default_date1 = today - dt.timedelta(days=7) # Default to 7 days ago
     default_date2 = today # Default to today
 
-    date1 = st.date_input("Select First Date", value=default_date1, key="date1")
-    date2 = st.date_input("Select Second Date", value=default_date2, key="date2")
+    date1 = st.date_input("Select Start Date", value=default_date1, key="date1")
+    date2 = st.date_input("Select End Date", value=default_date2, key="date2")
 
     if st.button("Get Analysis"):
         if date1 and date2:
