@@ -1,41 +1,50 @@
 import streamlit as st
-import zipfile
-import io
-import pandas as pd
-from io import StringIO
-
-import streamlit as st
 import pandas as pd
 import zipfile
 import io
+import requests
+import datetime as dt
+import os
+import time
 
-def process_csv(file_upload):
+# --- CONFIGURATION (Copied from bhavcopy_scraper.py) ---
+BASE_URL = "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date}_F_0000.csv.zip"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Accept": "application/zip",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive",
+}
+POLITE_DELAY = 1.5 # seconds
+
+def download_and_process_bhavcopy(target_date):
     """
-    Processes a CSV inside a ZIP file:
-    - Reads the CSV
-    - Selects required columns
-    - Filters rows for SctySrs in ['EQ', 'BE']
-    - Converts 'ClsPric' to numeric
+    Downloads the NSE Bhavcopy for a specific date directly into memory,
+    extracts the CSV, and processes it into a DataFrame.
+
+    Args:
+        target_date (datetime.date): The date for which to download the Bhavcopy.
+
+    Returns:
+        pandas.DataFrame or None: Processed DataFrame if successful, None otherwise.
     """
+    date_str = target_date.strftime("%Y%m%d")
+    url = BASE_URL.format(date=date_str)
 
-    if file_upload is None:
-        return None
-
-    # Ensure uploaded file is a ZIP
-    if not file_upload.name.endswith(".zip"):
-        st.error("Only ZIP files are allowed.")
-        return None
+    st.info(f"Attempting to download data for {target_date.strftime('%d-%b-%Y')}...")
 
     try:
-        with zipfile.ZipFile(file_upload, 'r') as z:
-            # Find the first CSV inside the zip
+        response = requests.get(url, headers=HEADERS, timeout=30)
+        response.raise_for_status() # Raise an exception for bad status codes
+
+        # Read ZIP content from memory
+        with zipfile.ZipFile(io.BytesIO(response.content), 'r') as z:
             csv_file_name = next((name for name in z.namelist() if name.endswith('.csv')), None)
             
             if csv_file_name is None:
-                st.error("No CSV file found inside the ZIP.")
+                st.error(f"No CSV file found inside the ZIP for {target_date.strftime('%d-%b-%Y')}.")
                 return None
 
-            # Open CSV inside zip
             with z.open(csv_file_name) as csv_file:
                 dataframe = pd.read_csv(io.TextIOWrapper(csv_file, 'utf-8'))
 
@@ -43,24 +52,32 @@ def process_csv(file_upload):
         required_columns = ['TradDt', 'SctySrs', 'FinInstrmNm', 'ClsPric', 'TckrSymb']
         for col in required_columns:
             if col not in dataframe.columns:
-                st.error(f"Missing required column: {col} in {csv_file_name}")
+                st.error(f"Missing required column: {col} in {csv_file_name} for {target_date.strftime('%d-%b-%Y')}")
                 return None
 
-        # Keep only required columns
         dataframe = dataframe[required_columns]
-
-        # Filter rows
         dataframe = dataframe[dataframe['SctySrs'].isin(['EQ', 'BE'])]
-
-        # Convert 'ClsPric' to numeric
         dataframe['ClsPric'] = pd.to_numeric(dataframe['ClsPric'], errors='coerce')
         dataframe.dropna(subset=['ClsPric'], inplace=True)
-
+        
+        st.success(f"Successfully processed data for {target_date.strftime('%d-%b-%Y')}.")
+        time.sleep(POLITE_DELAY) # Be polite to the server
         return dataframe
 
+    except requests.exceptions.HTTPError as http_err:
+        if response.status_code == 404:
+            st.warning(f"No data found for {target_date.strftime('%d-%b-%Y')}. It might be a weekend or a trading holiday.")
+        else:
+            st.error(f"HTTP Error for {target_date.strftime('%d-%b-%Y')}: {http_err} (Status code: {response.status_code})")
+    except requests.exceptions.RequestException as req_err:
+        st.error(f"A network error occurred for {target_date.strftime('%d-%b-%Y')}: {req_err}")
     except zipfile.BadZipFile:
-        st.error("Invalid ZIP file.")
-        return None
+        st.error(f"Invalid ZIP file downloaded for {target_date.strftime('%d-%b-%Y')}.")
+    except Exception as e:
+        st.error(f"An unexpected error occurred for {target_date.strftime('%d-%b-%Y')}: {e}")
+    
+    time.sleep(POLITE_DELAY) # Still wait even if there's an error
+    return None
 
 def calculate_percentage_difference(df1, df2):
     """
@@ -83,41 +100,49 @@ def calculate_percentage_difference(df1, df2):
 
 def render_stock_comparison_tab():
     st.title("NSE Stock Price Comparison Tool")
-    st.write("Upload two BhavCopy Zip files to compare stock prices and find percentage differences.")
+    st.write("Select two dates to compare stock prices and find percentage differences.")
 
-    st.subheader("Upload CSV Files")
-    file1 = st.file_uploader("Upload First BhavCopy ZIP File", type=["zip"], key="file1")
-    file2 = st.file_uploader("Upload Second BhavCopy ZIP File", type=["zip"], key="file2")
+    st.subheader("Select Dates for Comparison")
+    
+    today = dt.date.today()
+    default_date1 = today - dt.timedelta(days=7) # Default to 7 days ago
+    default_date2 = today # Default to today
 
-    if st.button("Process Files"):
-        if file1 is not None and file2 is not None:
-            st.info("Processing files... This may take a moment.")
-            
-            df1 = process_csv(file1)
-            df2 = process_csv(file2)
+    date1 = st.date_input("Select First Date", value=default_date1, key="date1")
+    date2 = st.date_input("Select Second Date", value=default_date2, key="date2")
 
-            if df1 is not None and df2 is not None:
-                result_df = calculate_percentage_difference(df1, df2)
-
-                if result_df is not None and not result_df.empty:
-                    st.subheader("Percentage Change in Closing Price (Descending Order)")
-                    st.dataframe(result_df)
-
-                    csv_output = result_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="Download Results as CSV",
-                        data=csv_output,
-                        file_name="percentage_change_report.csv",
-                        mime="text/csv",
-                    )
-                elif result_df is not None and result_df.empty:
-                    st.warning("No matching stocks found after filtering and merging, or no valid price changes to display.")
-                else:
-                    st.error("An error occurred during percentage difference calculation.")
+    if st.button("Get Analysis"):
+        if date1 and date2:
+            if date1 >= date2:
+                st.error("The first date must be earlier than the second date.")
             else:
-                st.error("Failed to process one or both CSV files. Please check the file content and column names.")
+                st.info(f"Initiating analysis for {date1.strftime('%d-%b-%Y')} and {date2.strftime('%d-%b-%Y')}...")
+                
+                df1 = download_and_process_bhavcopy(date1)
+                df2 = download_and_process_bhavcopy(date2)
+
+                if df1 is not None and df2 is not None:
+                    result_df = calculate_percentage_difference(df1, df2)
+
+                    if result_df is not None and not result_df.empty:
+                        st.subheader("Percentage Change in Closing Price (Descending Order)")
+                        st.dataframe(result_df)
+
+                        csv_output = result_df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="Download Results as CSV",
+                            data=csv_output,
+                            file_name="percentage_change_report.csv",
+                            mime="text/csv",
+                        )
+                    elif result_df is not None and result_df.empty:
+                        st.warning("No matching stocks found after filtering and merging, or no valid price changes to display.")
+                    else:
+                        st.error("An error occurred during percentage difference calculation.")
+                else:
+                    st.error("Failed to retrieve and process data for one or both selected dates. Please check the dates and try again.")
         else:
-            st.warning("Please upload both CSV files to proceed.")
+            st.warning("Please select both dates to proceed.")
 
     st.markdown("---")
     st.markdown("NSE Stock Analysis")
