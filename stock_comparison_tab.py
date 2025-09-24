@@ -49,16 +49,17 @@ def download_and_process_bhavcopy(target_date):
                 dataframe = pd.read_csv(io.TextIOWrapper(csv_file, 'utf-8'))
 
         # Required columns
-        required_columns = ['TradDt', 'SctySrs', 'FinInstrmNm', 'ClsPric', 'TckrSymb']
+        required_columns = ['TradDt', 'SctySrs', 'FinInstrmNm', 'ClsPric', 'TckrSymb', 'TtlTradgVol']
         for col in required_columns:
             if col not in dataframe.columns:
-                st.error(f"Missing required column: {col} in {csv_file_name} for {target_date.strftime('%d-%b-%Y')}")
+                st.error(f"Missing required column: {col} in {csv_file_name} for {target_date.strftime('%d-%b-%Y')}. Please ensure the BhavCopy file contains all expected columns.")
                 return None
 
         dataframe = dataframe[required_columns]
         dataframe = dataframe[dataframe['SctySrs'].isin(['EQ', 'BE'])]
         dataframe['ClsPric'] = pd.to_numeric(dataframe['ClsPric'], errors='coerce')
-        dataframe.dropna(subset=['ClsPric'], inplace=True)
+        dataframe['TtlTradgVol'] = pd.to_numeric(dataframe['TtlTradgVol'], errors='coerce') # Convert TtlTradgVol to numeric
+        dataframe.dropna(subset=['ClsPric', 'TtlTradgVol'], inplace=True) # Drop if either is missing
         
         st.success(f"Successfully processed data for {target_date.strftime('%d-%b-%Y')}.")
         time.sleep(POLITE_DELAY) # Be polite to the server
@@ -94,7 +95,14 @@ def calculate_percentage_difference(df1, df2):
 
     merged_df.dropna(subset=['Percentage_Change'], inplace=True)
 
-    result_df = merged_df[['FinInstrmNm', 'Percentage_Change']].sort_values(by='Percentage_Change', ascending=False)
+    result_df = merged_df[[
+        'FinInstrmNm', 
+        'ClsPric_file1', 
+        'TtlTradgVol_file1', 
+        'ClsPric_file2', 
+        'TtlTradgVol_file2', 
+        'Percentage_Change'
+    ]].sort_values(by='Percentage_Change', ascending=False)
 
     return result_df
 
