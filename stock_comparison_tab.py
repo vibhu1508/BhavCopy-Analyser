@@ -100,18 +100,18 @@ def calculate_percentage_difference(df1, df2):
 
     result_df = merged_df[[
         'FinInstrmNm', 
+        'Percentage_Change_Price',
         'ClsPric_file2', 
-        'TtlTradgVol_file2', 
         'Percentage_Change_Volume',
-        'Percentage_Change_Price'
+        'TtlTradgVol_file2'
     ]].sort_values(by='Percentage_Change_Price', ascending=False)
 
     result_df.rename(columns={
         'FinInstrmNm': 'Financial Instrument Name',
-        'ClsPric_file2': 'Closing Price',
-        'TtlTradgVol_file2': 'Total Trading Volume',
-        'Percentage_Change_Volume': 'Percentage Change in Trading Volume',
-        'Percentage_Change_Price': 'Percentage Change Price'
+        'Percentage_Change_Price': '%_Change_Price',
+        'ClsPric_file2': 'End Date Closing Price',
+        'Percentage_Change_Volume': '%_Change_Volume',
+        'TtlTradgVol_file2': 'End Date Volume'
     }, inplace=True)
 
     return result_df
