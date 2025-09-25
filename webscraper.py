@@ -1,211 +1,94 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 import pandas as pd
-import time
-import logging
-import json
 import requests
+import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def wait_for_table_data(driver, timeout=30):
-    """
-    Wait for the table to be populated with actual data (not just loading row)
-    """
-    start_time = time.time()
-    
-    while time.time() - start_time < timeout:
-        try:
-            # Check if table has meaningful data
-            rows = driver.find_elements(By.CSS_SELECTOR, "#table-CFanncEquity tbody tr")
-            
-            # Check if we have more than 1 row and if the first row has actual data
-            if len(rows) > 1:
-                first_row_text = rows[0].text
-                # Check if it's not a loading message
-                if first_row_text and "loading" not in first_row_text.lower() and "no data" not in first_row_text.lower():
-                    logger.info(f"Table loaded with {len(rows)} data rows")
-                    return True
-            
-            # Also check for "no records" message
-            no_data_elements = driver.find_elements(By.XPATH, "//td[contains(text(), 'No records found')]")
-            if no_data_elements:
-                logger.warning("No records found in table")
-                return False
-                
-        except StaleElementReferenceException:
-            # Elements refreshed, which is expected during loading
-            pass
-        except Exception as e:
-            logger.debug(f"Waiting for table: {e}")
-        
-        time.sleep(1)
-    
-    logger.warning(f"Timeout waiting for table data after {timeout} seconds")
-    return False
-
 def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     """
-    Robust scraper for NSE corporate announcements
+    Robust scraper for NSE corporate announcements using requests.
     """
-    
-    chrome_options = Options()
-    chrome_options.add_argument("--headless") # Run Chrome in headless mode
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0"
+    }
+
+    # The URL for corporate announcements API with index and symbol parameter.
+    url = f"https://www.nseindia.com/api/corporate-announcements?index=equities&symbol={symbol}"
+
     try:
-        # Step 1: Visit main page to establish session
-        logger.info("Establishing session with NSE...")
-        driver.get("https://www.nseindia.com/")
-        time.sleep(1) # Reduced sleep
-        
-        # Step 2: Navigate to announcements page
-        url = f"https://www.nseindia.com/companies-listing/corporate-filings-announcements?symbol={symbol}&tabIndex=equity"
-        logger.info(f"Navigating to announcements page...")
-        driver.get(url)
-        
-        # Step 3: Wait for page to fully load
-        time.sleep(2) # Reduced sleep
-        
-        # Step 4: Check if we need to interact with any elements
-        try:
-            # Sometimes there's a dropdown or button to load data
-            symbol_input = driver.find_element(By.ID, "symbolCode")
-            if symbol_input:
-                symbol_input.clear()
-                symbol_input.send_keys(symbol)
-                time.sleep(0.5) # Reduced sleep
-                
-                # Look for a search/submit button
-                search_buttons = driver.find_elements(By.XPATH, "//button[contains(text(), 'Search') or contains(@class, 'search')]")
-                if search_buttons:
-                    search_buttons[0].click()
-                    time.sleep(1) # Reduced sleep
-        except:
-            logger.info("No search interaction needed")
-        
-        # Step 5: Wait for table data to load
-        if not wait_for_table_data(driver, timeout=10): # Reduced timeout
-            logger.warning("Table data did not load properly")
-            
-            # Try to trigger data load by scrolling
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(0.5) # Reduced sleep
-            driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(0.5) # Reduced sleep
-            
-            # Check again
-            wait_for_table_data(driver, timeout=5) # Reduced timeout
-        
-        # Step 6: Extract data with retry logic
-        announcements = []
-        max_retries = 3
-        
-        for retry in range(max_retries):
-            try:
-                rows = driver.find_elements(By.CSS_SELECTOR, "#table-CFanncEquity tbody tr")
-                logger.info(f"Attempting to extract from {len(rows)} rows (attempt {retry + 1})")
-                
-                for i, row in enumerate(rows):
-                    try:
-                        # Re-find elements to avoid stale references
-                        current_rows = driver.find_elements(By.CSS_SELECTOR, "#table-CFanncEquity tbody tr")
-                        if i >= len(current_rows):
-                            break
-                            
-                        current_row = current_rows[i]
-                        cells = current_row.find_elements(By.TAG_NAME, "td")
-                        
-                        if len(cells) >= 7:
-                            row_text = current_row.text
-                            
-                            # Skip if it's a loading or no data row
-                            if "no record" in row_text.lower() or "loading" in row_text.lower():
-                                continue
-                            
-                            announcement = {
-                                'Symbol': cells[0].text.strip(),
-                                'Company Name': cells[1].text.strip(),
-                                'Subject': cells[2].text.strip(),
-                                'Details': cells[3].text.strip(),
-                                'Attachment Link': '', # Changed from PDF Link
-                                'Broadcast Date': ''
-                            }
-                            
-                            # Get Attachment link (assuming it's in cells[4])
-                            try:
-                                attachment_link_element = cells[4].find_element(By.TAG_NAME, "a")
-                                announcement['Attachment Link'] = attachment_link_element.get_attribute("href")
-                            except:
-                                pass
-                            
-                            # Get date
-                            if len(cells) > 6:
-                                announcement['Broadcast Date'] = cells[6].text.strip()
-                            
-                            # Only add if we have meaningful data
-                            if announcement['Subject'] and announcement['Subject'] != '-':
-                                announcements.append(announcement)
-                                logger.info(f"Extracted: {announcement['Subject'][:30]}...")
-                                if limit and len(announcements) >= limit:
-                                    logger.info(f"Reached desired limit of {limit} announcements, stopping extraction.")
-                                    break # Break out of the inner loop
-                                
-                    except StaleElementReferenceException:
-                        logger.debug(f"Stale element at row {i}, skipping...")
-                        continue
-                    except Exception as e:
-                        logger.debug(f"Error processing row {i}: {e}")
-                        continue
-                
-                if announcements and (limit is None or len(announcements) >= limit):
-                    break  # Success, exit retry loop
-                    
-            except Exception as e:
-                logger.warning(f"Retry {retry + 1} failed: {e}")
-                time.sleep(1) # Reduced sleep
-        
-        # Create DataFrame
-        df = pd.DataFrame(announcements)
-        
-        if not df.empty:
-            logger.info(f"✅ Successfully scraped {len(df)} announcements")
-        else:
-            logger.warning("❌ No announcements extracted")
-            
-            # Debug: Print page source snippet
-            try:
-                table_html = driver.find_element(By.ID, "table-CFanncEquity").get_attribute('innerHTML')
-                logger.debug(f"Table HTML snippet: {table_html[:500]}")
-            except Exception as e:
-                logger.debug(f"Could not get table HTML snippet: {e}")
-        
-        return df
-        
-    except Exception as e:
+        with requests.Session() as s:
+            s.headers.update(headers)
+
+            # First, make a GET request to the main page to establish a session and get cookies.
+            logger.info("Establishing session with NSE...")
+            s.get("https://www.nseindia.com/companies-listing/corporate-filings-announcements")
+
+            # Then, fetch the JSON data from the API endpoint.
+            logger.info(f"Fetching data from {url}...")
+            response = s.get(url)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            data = response.json()
+
+            if not data:
+                logger.warning("No data received from the API.")
+                return pd.DataFrame()
+
+            df = pd.DataFrame(data)
+
+            if df.empty:
+                logger.warning("DataFrame is empty after initial load.")
+                return pd.DataFrame()
+
+            # The symbol is now part of the URL, so direct filtering on the DataFrame might be redundant
+            # but we keep it for robustness in case the API returns more than just the requested symbol.
+            if symbol and 'symbol' in df.columns:
+                df_filtered = df[df['symbol'] == symbol.upper()]
+                if df_filtered.empty:
+                    logger.warning(f"No announcements found for symbol: {symbol} in the 'symbol' column from the API response.")
+                else:
+                    logger.info(f"Filtered {len(df_filtered)} announcements for symbol: {symbol}")
+                df = df_filtered
+            elif symbol and 'symbol' not in df.columns:
+                logger.warning("The 'symbol' column does not exist in the DataFrame. Cannot filter by symbol.")
+
+            if limit and not df.empty:
+                df = df.head(limit)
+                logger.info(f"Limited to {len(df)} announcements.")
+
+            # Rename columns to match what corporate_announcements_tab.py expects
+            df = df.rename(columns={
+                'symbol': 'Symbol',
+                'sm_name': 'Company Name',
+                'desc': 'Subject',
+                'attchmntFile': 'Attachment Link',
+                'an_dt': 'Broadcast Date'
+            })
+
+            # Select and reorder columns to match the expected output in corporate_announcements_tab.py
+            expected_columns = ['Symbol', 'Company Name', 'Subject', 'Details', 'Attachment Link', 'Broadcast Date']
+            for col in expected_columns:
+                if col not in df.columns:
+                    df[col] = '' # Add missing columns with empty string defaults
+            df = df[expected_columns]
+
+            if not df.empty:
+                logger.info(f"✅ Successfully scraped {len(df)} announcements")
+            else:
+                logger.warning("❌ No announcements extracted")
+
+            return df
+
+    except requests.exceptions.RequestException as e:
         logger.error(f"Error during scraping: {e}")
         return pd.DataFrame()
-        
-    finally:
-        driver.quit()
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
+        return pd.DataFrame()
 
 if __name__ == "__main__":
-    symbol = "AXISBANK"
+    symbol = "AXISBANK" # Reverted symbol to default
     
     print("=" * 60)
     print("NSE Corporate Announcements Scraper")
@@ -218,6 +101,8 @@ if __name__ == "__main__":
     if not df.empty:
         print(f"\n✅ Success! Scraped {len(df)} announcements")
         print("\nSample data:")
-        print(df[['Subject', 'Broadcast Date']].head(3))
+        # Using 'Subject' and 'Broadcast Date' as per renamed columns
+        print(df[['Subject', 'Broadcast Date']].head(5)) 
     else:
-        print("\n❌ Automated scraping failed")
+        print(f"\n❌ Automated scraping failed for symbol: {symbol}")
+        print("This might be due to no recent announcements for the symbol in the API feed.")
