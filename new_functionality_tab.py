@@ -223,28 +223,34 @@ def render_futures_tab(df):
     index_futures_tab, stock_futures_tab = st.tabs(["Index Futures (IDF)", "Stock Futures (STF)"]) # Reverted tab titles
 
     with index_futures_tab:
-        st.subheader("Index Futures (IDF)") # Reverted subheader
-        idf_df = df[df['FinInstrmTp'] == 'IDF'] # Reverted filter to 'IDF'
+        st.subheader("Index Futures (IDF)")
+        idf_df = df[df['FinInstrmTp'] == 'IDF']
 
         if idf_df.empty:
-            st.info("No Index Futures (IDF) data found for the selected date.") # Reverted message
+            st.info("No Index Futures (IDF) data found for the selected date.")
         else:
-            unique_symbols_idf = idf_df['TckrSymb'].unique()
-            selected_symbol_idf = st.selectbox("Select Ticker Symbol (IDF)", unique_symbols_idf, key="idf_symbol_select") # Reverted key and label
+            # Expiry Date Dropdown
+            unique_expiries_idf = ['All'] + sorted(idf_df['XpryDt'].unique().tolist())
+            selected_expiry_idf = st.selectbox("Select Expiry Date (IDF)", unique_expiries_idf, key="idf_expiry_select")
 
-            filtered_by_symbol_idf = idf_df[idf_df['TckrSymb'] == selected_symbol_idf]
+            filtered_by_expiry_idf = idf_df.copy()
+            if selected_expiry_idf != 'All':
+                filtered_by_expiry_idf = filtered_by_expiry_idf[filtered_by_expiry_idf['XpryDt'] == selected_expiry_idf]
 
-            # Remove Expiry Date Dropdown, filter only by Ticker Symbol
-            final_idf_df = filtered_by_symbol_idf.copy() # Use .copy() to avoid SettingWithCopyWarning
+            # Ticker Symbol Dropdown
+            unique_symbols_idf = ['All'] + sorted(filtered_by_expiry_idf['TckrSymb'].unique().tolist())
+            selected_symbol_idf = st.selectbox("Select Ticker Symbol (IDF)", unique_symbols_idf, key="idf_symbol_select")
+
+            final_idf_df = filtered_by_expiry_idf.copy()
+            if selected_symbol_idf != 'All':
+                final_idf_df = final_idf_df[final_idf_df['TckrSymb'] == selected_symbol_idf]
 
             if final_idf_df.empty:
-                st.info("No data for selected Index Futures symbol.")
+                st.info("No data for selected Index Futures filters.")
             else:
-                # Calculate Percentage Change in Closing Price
                 final_idf_df['Percentage_Change_Price'] = ((final_idf_df['ClsPric'] - final_idf_df['PrvsClsgPric']) / final_idf_df['PrvsClsgPric'].replace(0, pd.NA)) * 100
                 final_idf_df['Percentage_Change_Price'].fillna(0, inplace=True)
 
-                # Select, reorder, and rename columns
                 display_columns_idf = final_idf_df[[
                     'FinInstrmNm', 'UndrlygPric', 'ClsPric',  
                     'PrvsClsgPric','Percentage_Change_Price', 'OpnIntrst', 'ChngInOpnIntrst', '%CH IN OI'
@@ -261,27 +267,34 @@ def render_futures_tab(df):
                 st.dataframe(display_columns_idf)
 
     with stock_futures_tab:
-        st.subheader("Stock Futures (STF)") # Reverted subheader
-        stf_df = df[df['FinInstrmTp'] == 'STF'] # Reverted filter to 'STF'
+        st.subheader("Stock Futures (STF)")
+        stf_df = df[df['FinInstrmTp'] == 'STF']
 
         if stf_df.empty:
-            st.info("No Stock Futures (STF) data found for the selected date.") # Reverted message
+            st.info("No Stock Futures (STF) data found for the selected date.")
         else:
-            unique_symbols_stf = stf_df['TckrSymb'].unique()
+            # Expiry Date Dropdown
+            unique_expiries_stf = ['All'] + sorted(stf_df['XpryDt'].unique().tolist())
+            selected_expiry_stf = st.selectbox("Select Expiry Date (STF)", unique_expiries_stf, key="stf_expiry_select")
+
+            filtered_by_expiry_stf = stf_df.copy()
+            if selected_expiry_stf != 'All':
+                filtered_by_expiry_stf = filtered_by_expiry_stf[filtered_by_expiry_stf['XpryDt'] == selected_expiry_stf]
+
+            # Ticker Symbol Dropdown
+            unique_symbols_stf = ['All'] + sorted(filtered_by_expiry_stf['TckrSymb'].unique().tolist())
             selected_symbol_stf = st.selectbox("Select Ticker Symbol (STF)", unique_symbols_stf, key="stf_symbol_select")
 
-            # Remove Expiry Date Dropdown, filter only by Ticker Symbol
-            filtered_by_symbol_stf = stf_df[stf_df['TckrSymb'] == selected_symbol_stf]
-            final_stf_df = filtered_by_symbol_stf.copy() # Use .copy() to avoid SettingWithCopyWarning
+            final_stf_df = filtered_by_expiry_stf.copy()
+            if selected_symbol_stf != 'All':
+                final_stf_df = final_stf_df[final_stf_df['TckrSymb'] == selected_symbol_stf]
 
             if final_stf_df.empty:
-                st.info("No data for selected Stock Futures symbol.")
+                st.info("No data for selected Stock Futures filters.")
             else:
-                # Calculate Percentage Change in Closing Price
                 final_stf_df['Percentage_Change_Price'] = ((final_stf_df['ClsPric'] - final_stf_df['PrvsClsgPric']) / final_stf_df['PrvsClsgPric'].replace(0, pd.NA)) * 100
                 final_stf_df['Percentage_Change_Price'].fillna(0, inplace=True)
 
-                # Select, reorder, and rename columns
                 display_columns_stf = final_stf_df[[
                     'FinInstrmNm', 'UndrlygPric', 'ClsPric', 
                     'PrvsClsgPric','Percentage_Change_Price', 'OpnIntrst', 'ChngInOpnIntrst', '%CH IN OI'
