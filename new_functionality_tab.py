@@ -187,15 +187,31 @@ def render_futures_tab(df):
 
             filtered_by_symbol_idf = idf_df[idf_df['TckrSymb'] == selected_symbol_idf]
 
-            unique_expiries_idf = filtered_by_symbol_idf['XpryDt'].unique()
-            selected_expiry_idf = st.selectbox("Select Expiry Date (IDF)", unique_expiries_idf, key="idf_expiry_select") # Reverted key and label
-
-            final_idf_df = filtered_by_symbol_idf[filtered_by_symbol_idf['XpryDt'] == selected_expiry_idf]
+            # Remove Expiry Date Dropdown, filter only by Ticker Symbol
+            final_idf_df = filtered_by_symbol_idf.copy() # Use .copy() to avoid SettingWithCopyWarning
 
             if final_idf_df.empty:
-                st.info("No data for selected Index Futures symbol and expiry.")
+                st.info("No data for selected Index Futures symbol.")
             else:
-                st.dataframe(final_idf_df)
+                # Calculate Percentage Change in Closing Price
+                final_idf_df['Percentage_Change_Price'] = ((final_idf_df['ClsPric'] - final_idf_df['PrvsClsgPric']) / final_idf_df['PrvsClsgPric'].replace(0, pd.NA)) * 100
+                final_idf_df['Percentage_Change_Price'].fillna(0, inplace=True)
+
+                # Select, reorder, and rename columns
+                display_columns_idf = final_idf_df[[
+                    'FinInstrmNm', 'UndrlygPric', 'ClsPric',  
+                    'PrvsClsgPric','Percentage_Change_Price', 'OpnIntrst', 'ChngInOpnIntrst', '%CH IN OI'
+                ]].rename(columns={
+                    'FinInstrmNm': 'Financial Instrument Name',
+                    'UndrlygPric': 'Underlying Price',
+                    'ClsPric': 'Closing Price',
+                    'Percentage_Change_Price': '% Change Price',
+                    'PrvsClsgPric': 'Previous Closing Price',
+                    'OpnIntrst': 'Open Interest',
+                    'ChngInOpnIntrst': 'Change in Open Interest',
+                    '%CH IN OI': '% Change in OI'
+                })
+                st.dataframe(display_columns_idf)
 
     with stock_futures_tab:
         st.subheader("Stock Futures (STF)") # Reverted subheader
@@ -205,20 +221,34 @@ def render_futures_tab(df):
             st.info("No Stock Futures (STF) data found for the selected date.") # Reverted message
         else:
             unique_symbols_stf = stf_df['TckrSymb'].unique()
-            selected_symbol_stf = st.selectbox("Select Ticker Symbol (STF)", unique_symbols_stf, key="stf_symbol_select") # Reverted key and label
+            selected_symbol_stf = st.selectbox("Select Ticker Symbol (STF)", unique_symbols_stf, key="stf_symbol_select")
 
+            # Remove Expiry Date Dropdown, filter only by Ticker Symbol
             filtered_by_symbol_stf = stf_df[stf_df['TckrSymb'] == selected_symbol_stf]
-
-            unique_expiries_stf = filtered_by_symbol_stf['XpryDt'].unique()
-            selected_expiry_stf = st.selectbox("Select Expiry Date (STF)", unique_expiries_stf, key="stf_expiry_select") # Reverted key and label
-
-            final_stf_df = filtered_by_symbol_stf[filtered_by_symbol_stf['XpryDt'] == selected_expiry_stf]
+            final_stf_df = filtered_by_symbol_stf.copy() # Use .copy() to avoid SettingWithCopyWarning
 
             if final_stf_df.empty:
-                st.info("No data for selected Stock Futures symbol and expiry.")
+                st.info("No data for selected Stock Futures symbol.")
             else:
-                st.dataframe(final_stf_df)
+                # Calculate Percentage Change in Closing Price
+                final_stf_df['Percentage_Change_Price'] = ((final_stf_df['ClsPric'] - final_stf_df['PrvsClsgPric']) / final_stf_df['PrvsClsgPric'].replace(0, pd.NA)) * 100
+                final_stf_df['Percentage_Change_Price'].fillna(0, inplace=True)
 
+                # Select, reorder, and rename columns
+                display_columns_stf = final_stf_df[[
+                    'FinInstrmNm', 'UndrlygPric', 'ClsPric', 
+                    'PrvsClsgPric','Percentage_Change_Price', 'OpnIntrst', 'ChngInOpnIntrst', '%CH IN OI'
+                ]].rename(columns={
+                    'FinInstrmNm': 'Instrument Name',
+                    'UndrlygPric': 'Underlying Price',
+                    'ClsPric': 'Closing Price',
+                    'PrvsClsgPric': 'Previous Closing Price',
+                    'Percentage_Change_Price': '% Change Price',
+                    'OpnIntrst': 'Open Interest',
+                    'ChngInOpnIntrst': 'Change in Open Interest',
+                    '%CH IN OI': '% Change in OI'
+                })
+                st.dataframe(display_columns_stf)
 
 def render_nifty_tab(df):
     st.subheader("Nifty Analysis")
@@ -233,7 +263,6 @@ def render_nifty_tab(df):
         st.info("No Nifty options data found in the uploaded file.")
         return
 
-    # Dropdowns for filtering
     unique_symbols = nifty_options_df['TckrSymb'].unique()
     selected_symbol = st.selectbox("Select Ticker Symbol", unique_symbols, key="nifty_symbol_select")
 
