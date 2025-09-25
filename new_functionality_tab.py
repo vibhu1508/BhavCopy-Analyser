@@ -5,6 +5,7 @@ import io
 import requests
 import datetime as dt
 import time
+import altair as alt # Import Altair
 
 # --- CONFIGURATION ---
 # Base URL for the NSE F&O archives. The {date} part will be replaced automatically.
@@ -162,6 +163,52 @@ def render_options_tab(df):
     ).drop(columns=['CE_%CH IN OI_sort', 'PE_%CH IN OI_sort'])
 
     st.dataframe(merged_options_display)
+
+    # --- Chart 1: Open Interest (CE vs PE) ---
+    st.subheader("Open Interest by Strike Price")
+
+    # Melt the DataFrame to long format for Altair
+    oi_chart_data = merged_options_display[['StrkPric', 'CE_OpnIntrst', 'PE_OpnIntrst']].melt(
+        id_vars=['StrkPric'], 
+        var_name='Option Type', 
+        value_name='Open Interest'
+    )
+
+    # Define colors
+    color_scale_oi = alt.Scale(domain=['CE_OpnIntrst', 'PE_OpnIntrst'], range=['green', 'red'])
+
+    chart_oi = alt.Chart(oi_chart_data).mark_bar().encode(
+        x=alt.X('StrkPric:Q', title='Strike Price'),
+        y=alt.Y('Open Interest:Q', title='Open Interest'),
+        color=alt.Color('Option Type:N', scale=color_scale_oi, legend=alt.Legend(title="Option Type")),
+        tooltip=['StrkPric', 'Option Type', 'Open Interest']
+    ).properties(
+        title=f"Open Interest for {selected_symbol} (Expiry: {selected_expiry})"
+    ).interactive()
+    st.altair_chart(chart_oi, use_container_width=True)
+
+    # --- Chart 2: Change in Open Interest (CE vs PE) ---
+    st.subheader("Change in Open Interest by Strike Price")
+
+    # Melt the DataFrame to long format for Altair
+    pct_oi_chart_data = merged_options_display[['StrkPric', 'CE_ChngInOpnIntrst', 'PE_ChngInOpnIntrst']].melt(
+        id_vars=['StrkPric'], 
+        var_name='Option Type', 
+        value_name='Change in Open Interest'
+    )
+
+    # Define colors for Change in Open Interest
+    color_scale_chng_oi = alt.Scale(domain=['CE_ChngInOpnIntrst', 'PE_ChngInOpnIntrst'], range=['green', 'red'])
+
+    chart_chng_oi = alt.Chart(pct_oi_chart_data).mark_bar().encode(
+        x=alt.X('StrkPric:Q', title='Strike Price'),
+        y=alt.Y('Change in Open Interest:Q', title='Change in Open Interest'),
+        color=alt.Color('Option Type:N', scale=color_scale_chng_oi, legend=alt.Legend(title="Option Type")),
+        tooltip=['StrkPric', 'Option Type', 'Change in Open Interest']
+    ).properties(
+        title=f"Change in Open Interest for {selected_symbol} (Expiry: {selected_expiry})"
+    ).interactive()
+    st.altair_chart(chart_chng_oi, use_container_width=True)
 
 
 def render_futures_tab(df):
@@ -335,4 +382,4 @@ def render_new_functionality_tab():
         render_futures_tab(st.session_state['fo_data_df'])
     with options_tab:
         render_options_tab(st.session_state['fo_data_df'])
-        # 
+        #
