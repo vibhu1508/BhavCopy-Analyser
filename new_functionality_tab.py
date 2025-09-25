@@ -335,3 +335,4 @@ def render_new_functionality_tab():
         render_futures_tab(st.session_state['fo_data_df'])
     with options_tab:
         render_options_tab(st.session_state['fo_data_df'])
+        # 
