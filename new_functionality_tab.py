@@ -2,27 +2,71 @@ import streamlit as st
 import pandas as pd
 import zipfile
 import io
+import requests
+import datetime as dt
+import time
 
-def process_bhavcopy_zip(uploaded_zip_file):
-    if uploaded_zip_file is not None:
-        with zipfile.ZipFile(uploaded_zip_file, 'r') as z:
-            # Assuming there's only one CSV file in the zip
-            csv_file_name = [name for name in z.namelist() if name.endswith('.csv')][0]
+# --- CONFIGURATION ---
+# Base URL for the NSE F&O archives. The {date} part will be replaced automatically.
+FO_BASE_URL = "https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_{date}_F_0000.csv.zip"
+
+# Headers to mimic a real browser, helping to avoid connection errors.
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Accept": "application/zip",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive",
+}
+
+# Delay between each download request in seconds to be polite to the server.
+POLITE_DELAY = 1.5 # seconds
+
+def download_and_process_fo_bhavcopy(target_date):
+    """
+    Downloads the NSE F&O Bhavcopy for a specific date directly into memory,
+    extracts the CSV, and processes it into a DataFrame.
+
+    Args:
+        target_date (datetime.date): The date for which to download the Bhavcopy.
+
+    Returns:
+        pandas.DataFrame or None: Processed DataFrame if successful, None otherwise.
+    """
+    date_str = target_date.strftime("%Y%m%d")
+    url = FO_BASE_URL.format(date=date_str)
+
+    st.info(f"Attempting to download F&O data for {target_date.strftime('%d-%b-%Y')}...")
+
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=30)
+        response.raise_for_status() # Raise an exception for bad status codes
+
+        # Read ZIP content from memory
+        with zipfile.ZipFile(io.BytesIO(response.content), 'r') as z:
+            csv_file_name = next((name for name in z.namelist() if name.endswith('.csv')), None)
+            
+            if csv_file_name is None:
+                st.error(f"No CSV file found inside the ZIP for {target_date.strftime('%d-%b-%Y')}.")
+                return None
+
             with z.open(csv_file_name) as csv_file:
                 dataframe = pd.read_csv(io.TextIOWrapper(csv_file, 'utf-8'))
-        
 
         required_columns = [
             'TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp', 'FinInstrmNm',
             'ClsPric', 'PrvsClsgPric', 'UndrlygPric', 'SttlmPric',
-            'OpnIntrst', 'ChngInOpnIntrst'
+            'OpnIntrst', 'ChngInOpnIntrst', 'FinInstrmTp' # Added FinInstrmTp
         ]
         
         # Check for missing columns
         missing_columns = [col for col in required_columns if col not in dataframe.columns]
         if missing_columns:
-            st.error(f"Missing required columns: {', '.join(missing_columns)}")
+            st.error(f"Missing required columns: {', '.join(missing_columns)} for {target_date.strftime('%d-%b-%Y')}. Please ensure the BhavCopy file contains all expected columns.")
             return None
+        
+        # Ensure FinInstrmTp is treated as string, stripped of whitespace, and converted to uppercase for consistent filtering
+        if 'FinInstrmTp' in dataframe.columns:
+            dataframe['FinInstrmTp'] = dataframe['FinInstrmTp'].astype(str).str.strip().str.upper()
 
         dataframe = dataframe[required_columns]
 
@@ -31,16 +75,33 @@ def process_bhavcopy_zip(uploaded_zip_file):
         for col in numeric_cols:
             dataframe[col] = pd.to_numeric(dataframe[col], errors='coerce')
         
-        # Drop rows where essential numeric columns are NaN
-        dataframe.dropna(subset=['ClsPric', 'OpnIntrst', 'ChngInOpnIntrst', 'StrkPric'], inplace=True)
+        # Drop rows where essential numeric columns are NaN, excluding StrkPric for futures
+        # Futures typically have NaN for StrkPric, so dropping based on it would remove them.
+        dataframe.dropna(subset=['ClsPric', 'OpnIntrst', 'ChngInOpnIntrst'], inplace=True)
 
         # Calculate %CH IN OI
         # Handle cases where (OpnIntrst - ChngInOpnIntrst) might be zero or negative
         prev_oi = dataframe['OpnIntrst'] - dataframe['ChngInOpnIntrst']
         dataframe['%CH IN OI'] = (dataframe['ChngInOpnIntrst'] / prev_oi.replace(0, pd.NA)) * 100
         dataframe['%CH IN OI'].fillna(0, inplace=True) # Fill NaN (from division by zero) with 0
-
+        
+        st.success(f"Successfully processed F&O data for {target_date.strftime('%d-%b-%Y')}.")
+        time.sleep(POLITE_DELAY) # Be polite to the server
         return dataframe
+
+    except requests.exceptions.HTTPError as http_err:
+        if response.status_code == 404:
+            st.warning(f"No F&O data found for {target_date.strftime('%d-%b-%Y')}. It might be a weekend or a trading holiday.")
+        else:
+            st.error(f"HTTP Error for {target_date.strftime('%d-%b-%Y')}: {http_err} (Status code: {response.status_code})")
+    except requests.exceptions.RequestException as req_err:
+        st.error(f"A network error occurred for {target_date.strftime('%d-%b-%Y')}: {req_err}")
+    except zipfile.BadZipFile:
+        st.error(f"Invalid ZIP file downloaded for {target_date.strftime('%d-%b-%Y')}.")
+    except Exception as e:
+        st.error(f"An unexpected error occurred for {target_date.strftime('%d-%b-%Y')}: {e}")
+    
+    time.sleep(POLITE_DELAY) # Still wait even if there's an error
     return None
 
 def render_options_tab(df):
@@ -109,32 +170,54 @@ def render_futures_tab(df):
         st.info("No futures data available or uploaded.")
         return
     
-    # Filter for Futures data: FinInstrmNm contains 'FUT' and OptnTp is NaN or not present
-    futures_df = df[df['FinInstrmNm'].str.contains('FUT', na=False) & df['OptnTp'].isna()]
+    # The user wants to filter solely by FinInstrmTp for futures (IDF and STF)
+    # No need for FinInstrmNm.str.upper().str.endswith('FUT') or OptnTp.isna() here.
 
-    if futures_df.empty:
-        st.info("No futures data found in the uploaded file.")
-        return
-    
-    # Dropdowns for filtering
-    unique_symbols = futures_df['TckrSymb'].unique()
-    if not unique_symbols.size:
-        st.info("No unique ticker symbols found for futures.")
-        return
-    selected_symbol = st.selectbox("Select Ticker Symbol", unique_symbols, key="futures_symbol_select")
+    index_futures_tab, stock_futures_tab = st.tabs(["Index Futures (IDF)", "Stock Futures (STF)"]) # Reverted tab titles
 
-    filtered_by_symbol = futures_df[futures_df['TckrSymb'] == selected_symbol]
+    with index_futures_tab:
+        st.subheader("Index Futures (IDF)") # Reverted subheader
+        idf_df = df[df['FinInstrmTp'] == 'IDF'] # Reverted filter to 'IDF'
 
-    unique_expiries = filtered_by_symbol['XpryDt'].unique()
-    selected_expiry = st.selectbox("Select Expiry Date", unique_expiries, key="futures_expiry_select")
+        if idf_df.empty:
+            st.info("No Index Futures (IDF) data found for the selected date.") # Reverted message
+        else:
+            unique_symbols_idf = idf_df['TckrSymb'].unique()
+            selected_symbol_idf = st.selectbox("Select Ticker Symbol (IDF)", unique_symbols_idf, key="idf_symbol_select") # Reverted key and label
 
-    final_futures_df = filtered_by_symbol[filtered_by_symbol['XpryDt'] == selected_expiry]
+            filtered_by_symbol_idf = idf_df[idf_df['TckrSymb'] == selected_symbol_idf]
 
-    if final_futures_df.empty:
-        st.info("No data for selected symbol and expiry.")
-        return
+            unique_expiries_idf = filtered_by_symbol_idf['XpryDt'].unique()
+            selected_expiry_idf = st.selectbox("Select Expiry Date (IDF)", unique_expiries_idf, key="idf_expiry_select") # Reverted key and label
 
-    st.dataframe(final_futures_df)
+            final_idf_df = filtered_by_symbol_idf[filtered_by_symbol_idf['XpryDt'] == selected_expiry_idf]
+
+            if final_idf_df.empty:
+                st.info("No data for selected Index Futures symbol and expiry.")
+            else:
+                st.dataframe(final_idf_df)
+
+    with stock_futures_tab:
+        st.subheader("Stock Futures (STF)") # Reverted subheader
+        stf_df = df[df['FinInstrmTp'] == 'STF'] # Reverted filter to 'STF'
+
+        if stf_df.empty:
+            st.info("No Stock Futures (STF) data found for the selected date.") # Reverted message
+        else:
+            unique_symbols_stf = stf_df['TckrSymb'].unique()
+            selected_symbol_stf = st.selectbox("Select Ticker Symbol (STF)", unique_symbols_stf, key="stf_symbol_select") # Reverted key and label
+
+            filtered_by_symbol_stf = stf_df[stf_df['TckrSymb'] == selected_symbol_stf]
+
+            unique_expiries_stf = filtered_by_symbol_stf['XpryDt'].unique()
+            selected_expiry_stf = st.selectbox("Select Expiry Date (STF)", unique_expiries_stf, key="stf_expiry_select") # Reverted key and label
+
+            final_stf_df = filtered_by_symbol_stf[filtered_by_symbol_stf['XpryDt'] == selected_expiry_stf]
+
+            if final_stf_df.empty:
+                st.info("No data for selected Stock Futures symbol and expiry.")
+            else:
+                st.dataframe(final_stf_df)
 
 
 def render_nifty_tab(df):
@@ -200,20 +283,26 @@ def render_nifty_tab(df):
 
 def render_new_functionality_tab():
     st.title("Advanced Market Analysis")
-    st.write("Upload a BhavCopy ZIP file to analyze Nifty, Futures, and Options data.")
+    st.write("Select a date to analyze Nifty, Futures, and Options data.")
 
-    uploaded_zip_file = st.file_uploader("Upload BhavCopy ZIP File", type=["zip"])
+    today = dt.date.today()
+    selected_date = st.date_input("Select Date", value=today, key="fo_date_select")
 
-    df = None
-    if uploaded_zip_file:
-        df = process_bhavcopy_zip(uploaded_zip_file)
+    # Initialize session state for DataFrame if not already present
+    if 'fo_data_df' not in st.session_state:
+        st.session_state['fo_data_df'] = None
+
+    if st.button("Get Analysis", key="get_analysis_fo_button"):
+        if selected_date:
+            st.session_state['fo_data_df'] = download_and_process_fo_bhavcopy(selected_date)
+        else:
+            st.warning("Please select a date to proceed.")
 
     nifty_tab, futures_tab, options_tab = st.tabs(["Nifty", "Futures", "Options"])
 
     with nifty_tab:
-        render_nifty_tab(df)
+        render_nifty_tab(st.session_state['fo_data_df'])
     with futures_tab:
-        render_futures_tab(df)
+        render_futures_tab(st.session_state['fo_data_df'])
     with options_tab:
-        render_options_tab(df)
-        #new
+        render_options_tab(st.session_state['fo_data_df'])
