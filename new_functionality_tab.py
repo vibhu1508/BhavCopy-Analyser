@@ -7,6 +7,17 @@ import datetime as dt
 import time
 import altair as alt # Import Altair
 
+def color_change(val):
+    if isinstance(val, (int, float)):
+        color = 'green' if val > 0 else 'red' if val < 0 else ''
+        return f'color: {color}'
+    return ''
+
+def format_two_decimals(val):
+    if isinstance(val, (int, float)):
+        return f"{val:.2f}"
+    return val
+
 # --- CONFIGURATION ---
 # Base URL for the NSE F&O archives. The {date} part will be replaced automatically.
 FO_BASE_URL = "https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_{date}_F_0000.csv.zip"
@@ -162,7 +173,15 @@ def render_options_tab(df):
         ascending=[False, False]
     ).drop(columns=['CE_%CH IN OI_sort', 'PE_%CH IN OI_sort'])
 
-    st.dataframe(merged_options_display)
+    # Apply color and decimal formatting
+    styled_merged_options_display = merged_options_display.style \
+        .applymap(color_change, subset=['CE_%CH IN OI', 'PE_%CH IN OI']) \
+        .format(format_two_decimals, subset=[
+            'CE_ClsPric', 'CE_%CH IN OI', 'CE_OpnIntrst', 'CE_ChngInOpnIntrst',
+            'PE_ClsPric', 'PE_%CH IN OI', 'PE_OpnIntrst', 'PE_ChngInOpnIntrst',
+            'PCROI', 'StrkPric'
+        ])
+    st.dataframe(styled_merged_options_display)
 
     # --- Chart 1: Open Interest (CE vs PE) ---
     st.subheader("Open Interest by Strike Price")
@@ -264,7 +283,14 @@ def render_futures_tab(df):
                     'ChngInOpnIntrst': 'Change in Open Interest',
                     '%CH IN OI': '% Change in OI'
                 })
-                st.dataframe(display_columns_idf)
+                # Apply color and decimal formatting
+                styled_display_columns_idf = display_columns_idf.style \
+                    .applymap(color_change, subset=['% Change Price', '% Change in OI']) \
+                    .format(format_two_decimals, subset=[
+                        'Underlying Price', 'Closing Price', 'Previous Closing Price',
+                        '% Change Price', 'Open Interest', 'Change in Open Interest', '% Change in OI'
+                    ])
+                st.dataframe(styled_display_columns_idf)
 
     with stock_futures_tab:
         st.subheader("Stock Futures (STF)")
@@ -308,7 +334,14 @@ def render_futures_tab(df):
                     'ChngInOpnIntrst': 'Change in Open Interest',
                     '%CH IN OI': '% Change in OI'
                 })
-                st.dataframe(display_columns_stf)
+                # Apply color and decimal formatting
+                styled_display_columns_stf = display_columns_stf.style \
+                    .applymap(color_change, subset=['% Change Price', '% Change in OI']) \
+                    .format(format_two_decimals, subset=[
+                        'Underlying Price', 'Closing Price', 'Previous Closing Price',
+                        '% Change Price', 'Open Interest', 'Change in Open Interest', '% Change in OI'
+                    ])
+                st.dataframe(styled_display_columns_stf)
 
 def render_nifty_tab(df):
     st.subheader("Nifty Analysis")
@@ -367,7 +400,15 @@ def render_nifty_tab(df):
         ascending=[False, False]
     ).drop(columns=['CE_%CH IN OI_sort', 'PE_%CH IN OI_sort'])
 
-    st.dataframe(merged_nifty_display)
+    # Apply color and decimal formatting
+    styled_merged_nifty_display = merged_nifty_display.style \
+        .applymap(color_change, subset=['CE_%CH IN OI', 'PE_%CH IN OI']) \
+        .format(format_two_decimals, subset=[
+            'CE_ClsPric', 'CE_%CH IN OI', 'CE_OpnIntrst', 'CE_ChngInOpnIntrst',
+            'PE_ClsPric', 'PE_%CH IN OI', 'PE_OpnIntrst', 'PE_ChngInOpnIntrst',
+            'PCROI', 'StrkPric'
+        ])
+    st.dataframe(styled_merged_nifty_display)
 
 
 def render_new_functionality_tab():

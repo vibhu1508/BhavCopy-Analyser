@@ -7,6 +7,11 @@ import datetime as dt
 import os
 import time
 
+def format_two_decimals(val):
+    if isinstance(val, (int, float)):
+        return f"{val:.2f}"
+    return val
+
 # --- CONFIGURATION (Copied from bhavcopy_scraper.py) ---
 BASE_URL = "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{date}_F_0000.csv.zip"
 HEADERS = {
@@ -144,7 +149,19 @@ def render_stock_comparison_tab():
 
                     if result_df is not None and not result_df.empty:
                         st.subheader("Percentage Change in Closing Price (Descending Order)")
-                        st.dataframe(result_df)
+                        
+                        def color_change(val):
+                            if isinstance(val, (int, float)):
+                                color = 'green' if val > 0 else 'red' if val < 0 else ''
+                                return f'color: {color}'
+                            return ''
+
+                        styled_df = result_df.style \
+                            .applymap(color_change, subset=['%_Change_Price']) \
+                            .format(format_two_decimals, subset=[
+                                '%_Change_Price', 'End Date Closing Price', 'Ratio_Volume', 'End Date Volume'
+                            ])
+                        st.dataframe(styled_df)
 
                         csv_output = result_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
