@@ -35,7 +35,10 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
         with requests.Session() as s:
             s.headers.update(headers)
 
-            # First, make a GET request to the main page to establish a session and get cookies.
+            # It seems the NSE API requires a session to be established first,
+            # even if the user wants to directly use the API.
+            # The previous attempt to remove session establishment caused a 401 error locally.
+            # Re-adding the session establishment call.
             logger.info("Establishing session with NSE...")
             session_response = s.get("https://www.nseindia.com/companies-listing/corporate-filings-announcements")
             session_response.raise_for_status() # Ensure session establishment was successful
