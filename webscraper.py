@@ -37,10 +37,14 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
 
             # First, make a GET request to the main page to establish a session and get cookies.
             logger.info("Establishing session with NSE...")
-            s.get("https://www.nseindia.com/companies-listing/corporate-filings-announcements")
+            session_response = s.get("https://www.nseindia.com/companies-listing/corporate-filings-announcements")
+            session_response.raise_for_status() # Ensure session establishment was successful
+            logger.info(f"Session established with status: {session_response.status_code}")
 
             # Then, fetch the JSON data from the API endpoint.
             logger.info(f"Fetching data from {url}...")
+            # Add Referer header for the API call, as it's often checked by websites
+            s.headers.update({"Referer": "https://www.nseindia.com/companies-listing/corporate-filings-announcements"})
             response = s.get(url)
             response.raise_for_status()  # Raise an exception for HTTP errors
             
