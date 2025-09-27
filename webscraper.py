@@ -12,7 +12,8 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
     from_date and to_date should be in 'DD-MM-YYYY' format.
     """
     headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0"
+        # Changed User-Agent to a common Chrome on Windows string
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
     }
 
     # Base URL for corporate announcements API
@@ -51,10 +52,17 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
             response = s.get(url)
             response.raise_for_status()  # Raise an exception for HTTP errors
             
+            # Check content type before attempting JSON decoding
+            content_type = response.headers.get('Content-Type', '')
+            if 'application/json' not in content_type:
+                logger.error(f"Expected JSON but received {content_type}. Raw response: {response.text[:500]}...")
+                logger.error("This often indicates a CAPTCHA or block page from the server, especially in cloud environments.")
+                return pd.DataFrame()
+
             try:
                 data = response.json()
             except requests.exceptions.JSONDecodeError as e:
-                logger.error(f"JSON decoding error: {e}. Raw response: {response.text[:500]}...") # Log first 500 chars of raw response
+                logger.error(f"JSON decoding error: {e}. Raw response: {response.text[:500]}...")
                 return pd.DataFrame()
 
             if not data:
