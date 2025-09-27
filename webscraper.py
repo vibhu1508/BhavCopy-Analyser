@@ -1,73 +1,35 @@
 import pandas as pd
 import requests
 import logging
-import time # Added for delays
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, to_date: str = None, limit=None):
+def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
     """
-    Robust scraper for NSE corporate announcements using requests, with optional date range.
-    from_date and to_date should be in 'DD-MM-YYYY' format.
+    Robust scraper for NSE corporate announcements using requests.
     """
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", # More common User-Agent
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "DNT": "1", # Do Not Track
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "TE": "trailers"
+        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0"
     }
 
-    # Base URL for corporate announcements API
-    url = "https://www.nseindia.com/api/corporate-announcements?index=equities"
-
-    # Add symbol parameter only if provided
-    if symbol:
-        url += f"&symbol={symbol}"
-    
-    # Add date range parameters if provided
-    if from_date:
-        url += f"&from_date={from_date}"
-    if to_date:
-        url += f"&to_date={to_date}"
-    
-    # Add reqXbrl parameter as per user's example
-    url += "&reqXbrl=false"
+    # The URL for corporate announcements API with index and symbol parameter.
+    url = f"https://www.nseindia.com/api/corporate-announcements?index=equities&symbol={symbol}"
 
     try:
         with requests.Session() as s:
             s.headers.update(headers)
 
-            # It seems the NSE API requires a session to be established first,
-            # even if the user wants to directly use the API.
-            # The previous attempt to remove session establishment caused a 401 error locally.
-            # Re-adding the session establishment call.
+            # First, make a GET request to the main page to establish a session and get cookies.
             logger.info("Establishing session with NSE...")
-            session_response = s.get("https://www.nseindia.com/companies-listing/corporate-filings-announcements")
-            session_response.raise_for_status() # Ensure session establishment was successful
-            logger.info(f"Session established with status: {session_response.status_code}")
-
-            time.sleep(2) # Add a 2-second delay after session establishment
+            s.get("https://www.nseindia.com/companies-listing/corporate-filings-announcements")
 
             # Then, fetch the JSON data from the API endpoint.
             logger.info(f"Fetching data from {url}...")
-            # Add Referer header for the API call, as it's often checked by websites
-            s.headers.update({"Referer": "https://www.nseindia.com/companies-listing/corporate-filings-announcements"})
             response = s.get(url)
             response.raise_for_status()  # Raise an exception for HTTP errors
-            
-            try:
-                data = response.json()
-            except requests.exceptions.JSONDecodeError as e:
-                logger.error(f"JSON decoding error: {e}. Raw response: {response.text[:500]}...") # Log first 500 chars of raw response
-                return pd.DataFrame()
+            data = response.json()
 
             if not data:
                 logger.warning("No data received from the API.")
@@ -79,8 +41,8 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
                 logger.warning("DataFrame is empty after initial load.")
                 return pd.DataFrame()
 
-            # If a symbol was provided, filter the DataFrame by symbol.
-            # This is a safeguard in case the API returns data for multiple symbols even with the symbol parameter.
+            # The symbol is now part of the URL, so direct filtering on the DataFrame might be redundant
+            # but we keep it for robustness in case the API returns more than just the requested symbol.
             if symbol and 'symbol' in df.columns:
                 df_filtered = df[df['symbol'] == symbol.upper()]
                 if df_filtered.empty:
@@ -90,8 +52,6 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
                 df = df_filtered
             elif symbol and 'symbol' not in df.columns:
                 logger.warning("The 'symbol' column does not exist in the DataFrame. Cannot filter by symbol.")
-            elif not symbol: # If no symbol was provided, we expect all companies, so no symbol filtering needed here.
-                logger.info("Fetching announcements for all companies. No symbol-specific filtering applied post-API call.")
 
             if limit and not df.empty:
                 df = df.head(limit)
@@ -122,13 +82,9 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Error during scraping: {e}")
-        if 'response' in locals() and response is not None:
-            logger.error(f"Raw response on RequestException: {response.text[:500]}...")
         return pd.DataFrame()
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
-        if 'response' in locals() and response is not None:
-            logger.error(f"Raw response on unexpected error: {response.text[:500]}...")
         return pd.DataFrame()
 
 if __name__ == "__main__":
