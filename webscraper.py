@@ -6,16 +6,30 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
+def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, to_date: str = None, limit=None):
     """
-    Robust scraper for NSE corporate announcements using requests.
+    Robust scraper for NSE corporate announcements using requests, with optional date range.
+    from_date and to_date should be in 'DD-MM-YYYY' format.
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0"
     }
 
-    # The URL for corporate announcements API with index and symbol parameter.
-    url = f"https://www.nseindia.com/api/corporate-announcements?index=equities&symbol={symbol}"
+    # Base URL for corporate announcements API
+    url = "https://www.nseindia.com/api/corporate-announcements?index=equities"
+
+    # Add symbol parameter only if provided
+    if symbol:
+        url += f"&symbol={symbol}"
+    
+    # Add date range parameters if provided
+    if from_date:
+        url += f"&from_date={from_date}"
+    if to_date:
+        url += f"&to_date={to_date}"
+    
+    # Add reqXbrl parameter as per user's example
+    url += "&reqXbrl=false"
 
     try:
         with requests.Session() as s:
@@ -41,8 +55,8 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
                 logger.warning("DataFrame is empty after initial load.")
                 return pd.DataFrame()
 
-            # The symbol is now part of the URL, so direct filtering on the DataFrame might be redundant
-            # but we keep it for robustness in case the API returns more than just the requested symbol.
+            # If a symbol was provided, filter the DataFrame by symbol.
+            # This is a safeguard in case the API returns data for multiple symbols even with the symbol parameter.
             if symbol and 'symbol' in df.columns:
                 df_filtered = df[df['symbol'] == symbol.upper()]
                 if df_filtered.empty:
@@ -52,6 +66,8 @@ def scrape_nse_announcements_robust(symbol="AXISBANK", limit=None):
                 df = df_filtered
             elif symbol and 'symbol' not in df.columns:
                 logger.warning("The 'symbol' column does not exist in the DataFrame. Cannot filter by symbol.")
+            elif not symbol: # If no symbol was provided, we expect all companies, so no symbol filtering needed here.
+                logger.info("Fetching announcements for all companies. No symbol-specific filtering applied post-API call.")
 
             if limit and not df.empty:
                 df = df.head(limit)
