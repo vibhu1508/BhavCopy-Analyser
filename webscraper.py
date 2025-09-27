@@ -43,7 +43,12 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
             logger.info(f"Fetching data from {url}...")
             response = s.get(url)
             response.raise_for_status()  # Raise an exception for HTTP errors
-            data = response.json()
+            
+            try:
+                data = response.json()
+            except requests.exceptions.JSONDecodeError as e:
+                logger.error(f"JSON decoding error: {e}. Raw response: {response.text[:500]}...") # Log first 500 chars of raw response
+                return pd.DataFrame()
 
             if not data:
                 logger.warning("No data received from the API.")
@@ -98,9 +103,13 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
 
     except requests.exceptions.RequestException as e:
         logger.error(f"Error during scraping: {e}")
+        if 'response' in locals() and response is not None:
+            logger.error(f"Raw response on RequestException: {response.text[:500]}...")
         return pd.DataFrame()
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
+        if 'response' in locals() and response is not None:
+            logger.error(f"Raw response on unexpected error: {response.text[:500]}...")
         return pd.DataFrame()
 
 if __name__ == "__main__":
