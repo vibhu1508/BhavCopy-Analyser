@@ -1,6 +1,7 @@
 import pandas as pd
 import requests
 import logging
+import time # Added for delays
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -12,8 +13,16 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
     from_date and to_date should be in 'DD-MM-YYYY' format.
     """
     headers = {
-        # Changed User-Agent to a common Chrome on Windows string
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", # More common User-Agent
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "DNT": "1", # Do Not Track
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "TE": "trailers"
     }
 
     # Base URL for corporate announcements API
@@ -45,6 +54,8 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
             session_response.raise_for_status() # Ensure session establishment was successful
             logger.info(f"Session established with status: {session_response.status_code}")
 
+            time.sleep(2) # Add a 2-second delay after session establishment
+
             # Then, fetch the JSON data from the API endpoint.
             logger.info(f"Fetching data from {url}...")
             # Add Referer header for the API call, as it's often checked by websites
@@ -52,17 +63,10 @@ def scrape_nse_announcements_robust(symbol: str = None, from_date: str = None, t
             response = s.get(url)
             response.raise_for_status()  # Raise an exception for HTTP errors
             
-            # Check content type before attempting JSON decoding
-            content_type = response.headers.get('Content-Type', '')
-            if 'application/json' not in content_type:
-                logger.error(f"Expected JSON but received {content_type}. Raw response: {response.text[:500]}...")
-                logger.error("This often indicates a CAPTCHA or block page from the server, especially in cloud environments.")
-                return pd.DataFrame()
-
             try:
                 data = response.json()
             except requests.exceptions.JSONDecodeError as e:
-                logger.error(f"JSON decoding error: {e}. Raw response: {response.text[:500]}...")
+                logger.error(f"JSON decoding error: {e}. Raw response: {response.text[:500]}...") # Log first 500 chars of raw response
                 return pd.DataFrame()
 
             if not data:
