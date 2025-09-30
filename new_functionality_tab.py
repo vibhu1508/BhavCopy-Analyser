@@ -292,6 +292,34 @@ def render_futures_tab(df):
                     ])
                 st.dataframe(styled_display_columns_idf)
 
+                # --- Chart 1: Open Interest by Expiry Date for Index Futures ---
+                st.subheader("Index Futures Open Interest by Expiry Date")
+                idf_oi_chart_data = final_idf_df.groupby(['XpryDt', 'TckrSymb'])['OpnIntrst'].sum().reset_index()
+                
+                chart_idf_oi = alt.Chart(idf_oi_chart_data).mark_bar().encode(
+                    x=alt.X('XpryDt:N', title='Expiry Date', sort=alt.EncodingSortField(field="XpryDt", op="min", order='ascending')),
+                    y=alt.Y('OpnIntrst:Q', title='Open Interest'),
+                    color=alt.Color('TckrSymb:N', legend=alt.Legend(title="Ticker Symbol")),
+                    tooltip=['XpryDt', 'TckrSymb', 'OpnIntrst']
+                ).properties(
+                    title=f"Index Futures Open Interest (Symbol: {selected_symbol_idf}, Expiry: {selected_expiry_idf})"
+                ).interactive()
+                st.altair_chart(chart_idf_oi, use_container_width=True)
+
+                # --- Chart 2: Change in Open Interest by Expiry Date for Index Futures ---
+                st.subheader("Index Futures Change in Open Interest by Expiry Date")
+                idf_chng_oi_chart_data = final_idf_df.groupby(['XpryDt', 'TckrSymb'])['ChngInOpnIntrst'].sum().reset_index()
+
+                chart_idf_chng_oi = alt.Chart(idf_chng_oi_chart_data).mark_bar().encode(
+                    x=alt.X('XpryDt:N', title='Expiry Date', sort=alt.EncodingSortField(field="XpryDt", op="min", order='ascending')),
+                    y=alt.Y('ChngInOpnIntrst:Q', title='Change in Open Interest'),
+                    color=alt.Color('TckrSymb:N', legend=alt.Legend(title="Ticker Symbol")),
+                    tooltip=['XpryDt', 'TckrSymb', 'ChngInOpnIntrst']
+                ).properties(
+                    title=f"Index Futures Change in Open Interest (Symbol: {selected_symbol_idf}, Expiry: {selected_expiry_idf})"
+                ).interactive()
+                st.altair_chart(chart_idf_chng_oi, use_container_width=True)
+
     with stock_futures_tab:
         st.subheader("Stock Futures (STF)")
         stf_df = df[df['FinInstrmTp'] == 'STF']
@@ -342,6 +370,49 @@ def render_futures_tab(df):
                         '% Change Price', 'Open Interest', 'Change in Open Interest', '% Change in OI'
                     ])
                 st.dataframe(styled_display_columns_stf)
+
+                # Multiselect for plotting specific ticker symbols
+                unique_symbols_for_plot_stf = sorted(final_stf_df['TckrSymb'].unique().tolist())
+                selected_symbols_for_plot_stf = st.multiselect(
+                    "Select Ticker Symbols for Charts (STF)", 
+                    unique_symbols_for_plot_stf, 
+                    default=[], # No symbols pre-selected
+                    key="stf_plot_symbol_multiselect"
+                )
+
+                if not selected_symbols_for_plot_stf:
+                    st.info("Please select at least one ticker symbol for charts.")
+                else:
+                    # Filter data for plotting based on multiselect
+                    stf_plot_df = final_stf_df[final_stf_df['TckrSymb'].isin(selected_symbols_for_plot_stf)]
+
+                    # --- Chart 1: Open Interest by Expiry Date for Stock Futures ---
+                    st.subheader("Stock Futures Open Interest by Expiry Date")
+                    stf_oi_chart_data = stf_plot_df.groupby(['XpryDt', 'TckrSymb'])['OpnIntrst'].sum().reset_index()
+                    
+                    chart_stf_oi = alt.Chart(stf_oi_chart_data).mark_bar().encode(
+                        x=alt.X('XpryDt:N', title='Expiry Date', sort=alt.EncodingSortField(field="XpryDt", op="min", order='ascending')),
+                        y=alt.Y('OpnIntrst:Q', title='Open Interest'),
+                        color=alt.Color('TckrSymb:N', legend=alt.Legend(title="Ticker Symbol")),
+                        tooltip=['XpryDt', 'TckrSymb', 'OpnIntrst']
+                    ).properties(
+                        title=f"Stock Futures Open Interest (Selected Symbols, Expiry: {selected_expiry_stf})"
+                    ).interactive()
+                    st.altair_chart(chart_stf_oi, use_container_width=True)
+
+                    # --- Chart 2: Change in Open Interest by Expiry Date for Stock Futures ---
+                    st.subheader("Stock Futures Change in Open Interest by Expiry Date")
+                    stf_chng_oi_chart_data = stf_plot_df.groupby(['XpryDt', 'TckrSymb'])['ChngInOpnIntrst'].sum().reset_index()
+
+                    chart_stf_chng_oi = alt.Chart(stf_chng_oi_chart_data).mark_bar().encode(
+                        x=alt.X('XpryDt:N', title='Expiry Date', sort=alt.EncodingSortField(field="XpryDt", op="min", order='ascending')),
+                        y=alt.Y('ChngInOpnIntrst:Q', title='Change in Open Interest'),
+                        color=alt.Color('TckrSymb:N', legend=alt.Legend(title="Ticker Symbol")),
+                        tooltip=['XpryDt', 'TckrSymb', 'ChngInOpnIntrst']
+                    ).properties(
+                        title=f"Stock Futures Change in Open Interest (Selected Symbols, Expiry: {selected_expiry_stf})"
+                    ).interactive()
+                    st.altair_chart(chart_stf_chng_oi, use_container_width=True)
 
 def render_nifty_tab(df):
     st.subheader("Nifty Analysis")
@@ -409,6 +480,52 @@ def render_nifty_tab(df):
             'PCROI', 'StrkPric'
         ])
     st.dataframe(styled_merged_nifty_display)
+
+    # --- Chart 1: Open Interest (CE vs PE) for Nifty ---
+    st.subheader("Nifty Open Interest by Strike Price")
+
+    # Melt the DataFrame to long format for Altair
+    nifty_oi_chart_data = merged_nifty_display[['StrkPric', 'CE_OpnIntrst', 'PE_OpnIntrst']].melt(
+        id_vars=['StrkPric'],
+        var_name='Option Type',
+        value_name='Open Interest'
+    )
+
+    # Define colors
+    color_scale_nifty_oi = alt.Scale(domain=['CE_OpnIntrst', 'PE_OpnIntrst'], range=['green', 'red'])
+
+    chart_nifty_oi = alt.Chart(nifty_oi_chart_data).mark_bar().encode(
+        x=alt.X('StrkPric:Q', title='Strike Price'),
+        y=alt.Y('Open Interest:Q', title='Open Interest'),
+        color=alt.Color('Option Type:N', scale=color_scale_nifty_oi, legend=alt.Legend(title="Option Type")),
+        tooltip=['StrkPric', 'Option Type', 'Open Interest']
+    ).properties(
+        title=f"Nifty Open Interest for {selected_symbol} (Expiry: {selected_expiry})"
+    ).interactive()
+    st.altair_chart(chart_nifty_oi, use_container_width=True)
+
+    # --- Chart 2: Change in Open Interest (CE vs PE) for Nifty ---
+    st.subheader("Nifty Change in Open Interest by Strike Price")
+
+    # Melt the DataFrame to long format for Altair
+    nifty_pct_oi_chart_data = merged_nifty_display[['StrkPric', 'CE_ChngInOpnIntrst', 'PE_ChngInOpnIntrst']].melt(
+        id_vars=['StrkPric'],
+        var_name='Option Type',
+        value_name='Change in Open Interest'
+    )
+
+    # Define colors for Change in Open Interest
+    color_scale_nifty_chng_oi = alt.Scale(domain=['CE_ChngInOpnIntrst', 'PE_ChngInOpnIntrst'], range=['green', 'red'])
+
+    chart_nifty_chng_oi = alt.Chart(nifty_pct_oi_chart_data).mark_bar().encode(
+        x=alt.X('StrkPric:Q', title='Strike Price'),
+        y=alt.Y('Change in Open Interest:Q', title='Change in Open Interest'),
+        color=alt.Color('Option Type:N', scale=color_scale_nifty_chng_oi, legend=alt.Legend(title="Option Type")),
+        tooltip=['StrkPric', 'Option Type', 'Change in Open Interest']
+    ).properties(
+        title=f"Nifty Change in Open Interest for {selected_symbol} (Expiry: {selected_expiry})"
+    ).interactive()
+    st.altair_chart(chart_nifty_chng_oi, use_container_width=True)
 
 
 def render_new_functionality_tab():
